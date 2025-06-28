@@ -56,4 +56,4 @@ Para dúvidas, sugestões ou feedbacks, entre em contato:
 
 ## 🧱 Arquitetura do Projeto
 
-![Diagrama de arquitetura](docs/arquitetura.png)
+![Diagrama de arquitetura](docs/casodeuso.png)
