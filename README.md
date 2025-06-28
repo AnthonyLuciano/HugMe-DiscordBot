@@ -52,7 +52,7 @@ Para dúvidas, sugestões ou feedbacks, entre em contato:
 
 ---
 
-> Projeto pessoal desenvolvido com fins de aprendizado e apoio à comunidade autista. https://discord.gg/uYQwdjh7 💙
+> Projeto pessoal desenvolvido com fins de aprendizado e apoio à comunidade autista. 💙
 
 ## 🧱 Arquitetura do Projeto
 
