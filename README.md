@@ -1,7 +1,3 @@
-Claro! Aqui está o seu README atualizado para refletir a nova stack com **Python**:
-
----
-
 # 🤗 HugMe - Gerenciador de Apoios via PagBank para Discord (Em Desenvolvimento)
 
 **HugMe** é um projeto em desenvolvimento que visa integrar o sistema de doações mensais via **PagBank** a um servidor Discord da comunidade autista. Através de um bot, o sistema atribui automaticamente cargos especiais no Discord aos apoiadores com base em seu status de contribuição \:D.
