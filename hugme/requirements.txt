@@ -1,0 +1,6 @@
+discord.py
+httpx
+SQLAlchemy
+asyncpg
+python-dotenv
+aiohttp
