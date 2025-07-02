@@ -17,11 +17,13 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 
 Funcionalidades previstas:
 
-* [X] Simplismente funcionar funcionar
+* [X] Configuração inicial do ambiente Python com virtualenv
+* [X] Conexão com PostgreSQL configurada (após resolver problemas de permissão)
+* [X] Instalação e configuração do SQLAlchemy ORM
 * [ ] Integração segura com a API do PagBank (cliente, token e transações)
 * [ ] Persistência de usuários e doações no PostgreSQL
 * [ ] Validação periódica do status dos apoiadores
-* [X] Integração com Discord via [`discord.py`](https://github.com/Rapptz/discord.py)
+* [X] Configuração básica do discord.py (após resolver importação)
 * [ ] Atribuição automática de cargos no Discord
 * [ ] Painel web administrativo (Flask ou FastAPI + frontend opcional)
 * [ ] Logs e alertas de falhas em operações críticas
@@ -38,8 +40,11 @@ Funcionalidades previstas:
 
 ## 🧭 Próximos Passos
 
+* [X] Resolver problemas de importação do módulo bot
+* [X] Instalar e configurar psycopg2 para conexão com PostgreSQL
+* [X] Corrigir permissões do usuário PostgreSQL para criação de tabelas
 * [ ] Finalizar comandos básicos no Discord
-* [ ] Implementar integração com PagBank (criação e verificação de transações)
+* [ ] Implementar integração com PagBank
 * [ ] Armazenar e consultar doações com SQLAlchemy
 * [ ] Tarefa agendada para atualizar cargos de acordo com o tempo de apoio
 * [ ] Criar sistema de logs e alertas para falhas de sincronização
