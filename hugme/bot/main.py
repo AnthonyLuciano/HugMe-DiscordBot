@@ -1,4 +1,4 @@
-import discord, os, asyncio, logging
+import discord, os, logging
 from discord.ext import commands
 from dotenv import load_dotenv
 from bot.database import Base, engine
@@ -19,13 +19,13 @@ class HugMeBot(commands.Bot):
         intents.message_content = True
         intents.members = True
         super().__init__(
-            command_prefix='!', 
-            intents=intents,
+            command_prefix='!',  # Mantém prefixo para comandos tradicionais
+            intents=discord.Intents.all(),
+            application_id=os.getenv('APPLICATION_ID'),
             help_command=None,
             activity=discord.Game(name="Ajudando a comunidade")
         )
-
-        self._init_db()  # Apenas para supporters
+        self._init_db()
 
     def _init_db(self):
         """Cria apenas as tabelas necessárias"""
@@ -39,7 +39,7 @@ class HugMeBot(commands.Bot):
     async def setup_hook(self):
         """Configurações iniciais quando o bot está inicializando"""
         try:
-            # Carrega todos os cogs da pasta commands
+            # Primeiro carrega todos os cogs tradicionais
             for filename in os.listdir('./bot/commands'):
                 if filename.endswith('.py') and not filename.startswith('_'):
                     try:
@@ -47,8 +47,11 @@ class HugMeBot(commands.Bot):
                         logger.info(f"Extensão '{filename}' carregada com sucesso")
                     except Exception as e:
                         logger.error(f"Erro ao carregar cog {filename}: {e}")
-                    
-            logger.info("Todas as extensões foram carregadas")
+            
+            # Sincroniza comandos slash
+            await self.tree.sync()
+            logger.info("Comandos slash sincronizados")
+            
         except Exception as e:
             logger.error(f"Erro ao carregar extensões: {e}")
 
