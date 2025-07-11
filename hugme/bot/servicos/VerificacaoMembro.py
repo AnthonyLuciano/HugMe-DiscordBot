@@ -2,14 +2,26 @@ import discord
 from datetime import datetime, timezone
 
 class VerificacaoMembro:
-    """Apenas calcula tempo de servidor - SEM níveis, SEM banco de dados"""
-    
+    """Classe para calcular o tempo de permanência de um membro no servidor."""
+
     def __init__(self, bot):
         self.bot = bot
 
     async def tempo_servidor(self, member: discord.Member) -> str:
+        """Calcula o tempo de permanência de um membro no servidor e retorna uma string formatada.
+
+        Args:
+            member (discord.Member): O membro do Discord a ser verificado.
+
+        Returns:
+            str: String formatada com o tempo de permanência (ex: "1 ano, 2 meses, 3 dias").
+        """
         agora = datetime.now(timezone.utc)
-        entrada = member.joined_at or agora  # Fallback caso joined_at seja None
+        entrada = member.joined_at
+
+        if entrada is None:
+            return "tempo desconhecido"
+
         diferenca = agora - entrada
 
         # Calcula os componentes de tempo
@@ -35,3 +47,14 @@ class VerificacaoMembro:
             return "menos de 1 hora"
             
         return ', '.join(partes)
+
+    async def obter_guild_id(self, member: discord.Member) -> int:
+        """Obtém o ID do servidor (guild) a partir do objeto member.
+
+        Args:
+            member (discord.Member): O membro do Discord.
+
+        Returns:
+            int: ID do servidor.
+        """
+        return member.guild.id

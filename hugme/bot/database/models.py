@@ -4,17 +4,17 @@ from datetime import datetime, timezone
 
 Base = declarative_base()
 
-class Supporter(Base):
-    __tablename__ = 'supporters'
+class Apoiador(Base):
+    __tablename__ = 'apoiadores'
     
     id = Column(Integer, primary_key=True)
-    discord_id = Column(String(20), unique=True, nullable=False)
-    pagbank_id = Column(String(50), unique=True)
-    supporter_since = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    last_payment = Column(DateTime(timezone=True))
-    is_active = Column(Boolean, default=True)
-    tier = Column(Integer, default=1)
-    benefits_expire = Column(DateTime(timezone=True))
+    discord_id = Column(String(20), unique=True, nullable=False)  # ID do usuário no Discord
+    id_pagamento = Column(String(50), unique=True)  # ID único do pagamento (pode ser usado para outros gateways)
+    data_inicio = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))  # Data de início do apoio
+    ultimo_pagamento = Column(DateTime(timezone=True))  # Data do último pagamento
+    ativo = Column(Boolean, default=True)  # Status do apoio (ativo/inativo)
+    nivel = Column(Integer, default=1)  # Nível de apoio (1 a 10, por exemplo)
+    data_expiracao = Column(DateTime(timezone=True))  # Data de expiração dos benefícios
     
     def __repr__(self):
-        return f"<Supporter(discord_id={self.discord_id}, tier={self.tier})>"
+        return f"<Apoiador(discord_id={self.discord_id}, nivel={self.nivel})>"
