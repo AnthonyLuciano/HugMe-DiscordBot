@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard</h1>
+        <p>Bem-vindo, {{ user.username }}!</p>
+        <nav>
+            <a href="/servers">Servidores</a>
+            <a href="/commands">Comandos</a>
+        </nav>
+        <h2>Apoiadores</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Discord</th>
+                    <th>Tipo de Apoio</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for apoiador in apoiadores %}
+                <tr>
+                    <td>{{ apoiador.discord_id }}</td>
+                    <td>{{ apoiador.tipo_apoio }}</td>
+                    <td>{{ "Ativo" if apoiador.ativo else "Inativo" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

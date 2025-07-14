@@ -10,31 +10,28 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 
 ## 🚧 Status do Projeto
 **Este projeto está em desenvolvimento ativo.**
-
 ### Funcionalidades concluídas:
 - [X] Configuração inicial do ambiente Python com virtualenv.
 - [X] Conexão com PostgreSQL configurada (após resolver problemas de permissão).
 - [X] Instalação e configuração do SQLAlchemy ORM.
 - [X] Configuração básica do discord.py (comandos híbridos e eventos).
 - [X] Modelo de banco de dados para apoiadores (`Apoiador`).
-
+- [X] Painel web administrativo (FastAPI + frontend).
+- [X] Comandos básicos no Discord (`!ajuda`, `!status`, `!iniciar_apoio`).
+- [X] Finalizar comandos básicos no Discord.
 ### Funcionalidades em andamento:
 - [ ] Sistema de doações via PIX (envio e validação de comprovantes).
-- [ ] Comandos básicos no Discord (`!ajuda`, `!status`, `!iniciar_apoio`).
 - [ ] Atribuição automática de cargos baseada no tempo de apoio.
 - [ ] Tarefas agendadas para verificação de expiração de apoios.
-
 ### Funcionalidades futuras:
-- [ ] Painel web administrativo (Flask ou FastAPI + frontend opcional).
 - [ ] Logs e alertas de falhas em operações críticas.
 - [ ] Configurar deploy contínuo (CI/CD).
 
 ## 🧭 Próximos Passos
-- [ ] Finalizar comandos básicos no Discord.
 - [ ] Implementar sistema de envio e validação de comprovantes PIX.
 - [ ] Criar tarefa agendada para atualização de cargos.
 - [ ] Desenvolver sistema de logs e alertas.
-- [ ] Iniciar desenvolvimento do painel administrativo web.
+- [ ] Melhorar painel administrativo (adicionar mais funcionalidades).
 
 ## 🛠 Tecnologias Utilizadas
 - [Python 3.12+](https://www.python.org/)

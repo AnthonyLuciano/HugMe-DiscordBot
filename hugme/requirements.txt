@@ -4,3 +4,10 @@ SQLAlchemy
 asyncpg
 python-dotenv
 aiohttp
+fastapi
+uvicorn
+jinja2
+python-multipart
+requests-oauthlib
+authlib
+itsdangerous

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Administrativo</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Painel Administrativo</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Discord</th>
+                    <th>Tipo de Apoio</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for apoiador in apoiadores %}
+                <tr>
+                    <td>{{ apoiador.discord_id }}</td>
+                    <td>{{ apoiador.tipo_apoio }}</td>
+                    <td>{{ "Ativo" if apoiador.ativo else "Inativo" }}</td>
+                    <td>
+                        <a href="/apoiador/{{ apoiador.discord_id }}">Detalhes</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <script src="/static/js/script.js"></script>
+</body>
+</html>

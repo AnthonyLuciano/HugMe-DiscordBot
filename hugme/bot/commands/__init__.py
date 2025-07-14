@@ -2,9 +2,12 @@
 # It can be used to register commands that the bot will respond to.
 
 from bot.commands.tempo import setup as tempo_setup
-from bot.commands.botcheck import setup as botcheck
+from bot.commands.botcheck import setup as botcheck_setup
+from bot.commands.doar import setup as doar_setup
+
 
 async def setup_all(bot):
     await tempo_setup(bot)
-    await botcheck(bot)
+    await botcheck_setup(bot)
+    await doar_setup(bot)
     # Adicione outros comandos aqui
