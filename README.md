@@ -17,7 +17,7 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [X] Configuração básica do discord.py (comandos híbridos e eventos).
 - [X] Modelo de banco de dados para apoiadores (`Apoiador`).
 - [X] Painel web administrativo (FastAPI + frontend).
-- [X] Comandos básicos no Discord (`!ajuda`, `!status`, `!iniciar_apoio`).
+- [X] Comandos básicos no Discord (`!ajuda`, `!status`, `!doar`).
 - [X] Finalizar comandos básicos no Discord.
 ### Funcionalidades em andamento:
 - [ ] Sistema de doações via PIX (envio e validação de comprovantes).
