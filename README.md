@@ -29,6 +29,13 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [ ] Logs e alertas de falhas em operações críticas.
 - [ ] Configurar deploy contínuo (CI/CD).
 
+## 🧭 Próximos Passos
+- [ ] Finalizar comandos básicos no Discord.
+- [ ] Implementar sistema de envio e validação de comprovantes PIX.
+- [ ] Criar tarefa agendada para atualização de cargos.
+- [ ] Desenvolver sistema de logs e alertas.
+- [ ] Iniciar desenvolvimento do painel administrativo web.
+
 ## 🛠 Tecnologias Utilizadas
 - [Python 3.12+](https://www.python.org/)
 - [discord.py](https://github.com/Rapptz/discord.py)
@@ -37,13 +44,6 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [asyncio](https://docs.python.org/3/library/asyncio.html)
 - [Railway.app](https://railway.app/) para banco(futuramente)
 - [Render](https://render.com/) hospedagem do bot (futuramente)
-
-## 🧭 Próximos Passos
-- [ ] Finalizar comandos básicos no Discord.
-- [ ] Implementar sistema de envio e validação de comprovantes PIX.
-- [ ] Criar tarefa agendada para atualização de cargos.
-- [ ] Desenvolver sistema de logs e alertas.
-- [ ] Iniciar desenvolvimento do painel administrativo web.
 
 ## 📬 Contato
 Para dúvidas, sugestões ou feedbacks, entre em contato:
