@@ -12,26 +12,33 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 **Este projeto está em desenvolvimento ativo.**
 ### Funcionalidades concluídas:
 - [X] Configuração inicial do ambiente Python com virtualenv.
-- [X] Conexão com PostgreSQL configurada (após resolver problemas de permissão).
-- [X] Instalação e configuração do SQLAlchemy ORM.
-- [X] Configuração básica do discord.py (comandos híbridos e eventos).
-- [X] Modelo de banco de dados para apoiadores (`Apoiador`).
+- [X] Conexão com PostgreSQL configurada.
+- [X] Configuração do SQLAlchemy ORM.
+- [X] Sistema básico do discord.py (comandos/eventos).
+- [X] Modelo de banco de dados para apoiadores.
 - [X] Painel web administrativo (FastAPI + frontend).
-- [X] Comandos básicos no Discord (`!ajuda`, `!status`, `!iniciar_apoio`).
-- [X] Finalizar comandos básicos no Discord.
+- [X] Comandos básicos no Discord.
+- [X] Sistema de verificação de tempo no servidor.
+- [X] Atribuição de cargos via botão interativo.
+
 ### Funcionalidades em andamento:
-- [ ] Sistema de doações via PIX (envio e validação de comprovantes).
-- [ ] Atribuição automática de cargos baseada no tempo de apoio.
-- [ ] Tarefas agendadas para verificação de expiração de apoios.
+- [ ] Integração completa com PIX (envio/validação).
+- [ ] Tarefas agendadas para expiração de apoios.
+- [ ] Refinamento do painel administrativo.
+
 ### Funcionalidades futuras:
-- [ ] Logs e alertas de falhas em operações críticas.
-- [ ] Configurar deploy contínuo (CI/CD).
+- [ ] Sistema avançado de logs/alertas.
+- [ ] Configuração de CI/CD.
+- [ ] Dashboard de métricas para apoiadores.
+- [ ] Sistema de notificações via webhook.
 
 ## 🧭 Próximos Passos
-- [ ] Implementar sistema de envio e validação de comprovantes PIX.
-- [ ] Criar tarefa agendada para atualização de cargos.
-- [ ] Desenvolver sistema de logs e alertas.
-- [ ] Melhorar painel administrativo (adicionar mais funcionalidades).
+- [ ] Finalizar integração PIX (API de pagamentos)
+- [ ] Implementar tasks agendadas para:
+- [ ] Verificação de expiração
+- [ ] Atualização de cargos
+- [ ] Adicionar seção de logs no painel
+- [ ] Documentar API para integrações externas
 
 ## 🛠 Tecnologias Utilizadas
 - [Python 3.12+](https://www.python.org/)

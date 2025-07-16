@@ -4,13 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Servidores</title>
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="container">
         <h1>Servidores</h1>
-        <p>Lista de servidores onde o bot está presente:</p>
-        <!-- Adicione a lista de servidores aqui -->
+        <p>Lista de servidores onde você tem permissões administrativas:</p>
+        <ul>
+            {% for guild in guilds %}
+            <li>
+                <strong>{{ guild.name }}</strong> (ID: {{ guild.id }})
+                {% if guild.is_admin %}  <!-- Verifica permissão de administrador -->
+                    <span class="badge">Admin</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
     </div>
 </body>
 </html>

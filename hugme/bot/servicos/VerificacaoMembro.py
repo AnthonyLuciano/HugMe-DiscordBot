@@ -58,3 +58,43 @@ class VerificacaoMembro:
             int: ID do servidor.
         """
         return member.guild.id
+    
+    async def verificar_tempo_minimo(self, member: discord.Member, tempo_minimo_dias: int) -> bool:
+        """Verifica se o membro tem o tempo mínimo necessário no servidor.
+        
+        Args:
+            member: O membro a verificar
+            tempo_minimo_dias: Tempo mínimo em dias
+            
+        Returns:
+            bool: True se atender ao requisito
+        """
+        if member.joined_at is None:
+            return False
+
+        diferenca = datetime.now(timezone.utc) - member.joined_at
+        return diferenca.days >= tempo_minimo_dias
+    
+    async def aplicar_cargo_se_qualificado(self, member: discord.Member, cargo_id: int, tempo_minimo_dias: int) -> str:
+        """Tenta aplicar um cargo se o membro atender ao tempo mínimo.
+        
+        Args:
+            member: Membro a verificar
+            cargo_id: ID do cargo a aplicar
+            tempo_minimo_dias: Tempo mínimo em dias
+            
+        Returns:
+            str: Mensagem com o resultado
+        """
+        cargo = member.guild.get_role(cargo_id)
+        if not cargo:
+            return "Cargo não encontrado!"
+        #^^pegador de excessoes    
+        if await self.verificar_tempo_minimo(member, tempo_minimo_dias):
+            await member.add_roles(cargo)
+            return f"Cargo {cargo.name} aplicado com sucesso!"
+        #^^adiciona cargo quando verificado
+        else:
+            tempo_atual = await self.tempo_servidor(member)
+            return f"Você precisa de {tempo_minimo_dias} dias no servidor (atual: {tempo_atual})"
+        #^^se nao poder ser verificado, avisa quando pode
