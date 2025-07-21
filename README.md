@@ -20,9 +20,13 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [X] Comandos básicos no Discord.
 - [X] Sistema de verificação de tempo no servidor.
 - [X] Atribuição de cargos via botão interativo.
+- Integração com PIX: [███░░░░░░░] 30%
+  - [x] Envio do PIX implementado
+  - [ ] Validação do pagamento pendente
+  - [ ] Cargos de Apoio Automáticos
+
 
 ### Funcionalidades em andamento:
-- [ ] Integração completa com PIX (envio/validação).
 - [ ] Tarefas agendadas para expiração de apoios.
 - [ ] Refinamento do painel administrativo.
 
@@ -46,8 +50,11 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [SQLAlchemy ORM](https://www.sqlalchemy.org/)
 - [PostgreSQL](https://www.postgresql.org/)
 - [asyncio](https://docs.python.org/3/library/asyncio.html)
-- [Railway.app](https://railway.app/) para banco(futuramente)
-- [Render](https://render.com/) hospedagem do bot (futuramente)
+- [Railway.app](https://railway.app/) *(planejado para banco de dados)*
+- [Render](https://render.com/) *(planejado para hospedagem do bot)*
+- [PagSeguro (PagBank)](https://pagseguro.uol.com.br/) *(integração em andamento)*
+
+
 
 ## 📬 Contato
 Para dúvidas, sugestões ou feedbacks, entre em contato:

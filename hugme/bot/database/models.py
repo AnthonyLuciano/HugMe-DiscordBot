@@ -4,6 +4,14 @@ from datetime import datetime, timezone
 
 Base = declarative_base()
 
+class PixConfig(Base):
+    __tablename__ = 'pix_config'
+
+    id = Column(Integer, primary_key=True)
+    chave = Column(String(100), nullable=False, unique=True)
+    atualizado_em = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    atualizado_por = Column(String(20))
+
 class Apoiador(Base):
     __tablename__ = 'apoiadores'
     
