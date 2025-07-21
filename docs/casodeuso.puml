@@ -10,7 +10,7 @@ rectangle Bot {
   usecase "Iniciar processo de doação" as UC1
   usecase "Escolher forma de pagamento" as UC2
   usecase "Gerar QR Code PIX" as UC3
-  usecase "Visualizar link PayPal" as UC4
+  usecase "Visualizar link PagBank" as UC4
   usecase "Aprovar doação" as UC6
   usecase "Visualizar painel admin" as UC7
 }
