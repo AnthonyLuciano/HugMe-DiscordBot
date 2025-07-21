@@ -11,7 +11,6 @@ rectangle Bot {
   usecase "Escolher forma de pagamento" as UC2
   usecase "Gerar QR Code PIX" as UC3
   usecase "Visualizar link PayPal" as UC4
-  usecase "Configurar chave PIX" as UC5
   usecase "Aprovar doação" as UC6
   usecase "Visualizar painel admin" as UC7
 }
@@ -22,11 +21,8 @@ UC2 --> UC3 : PIX selecionado
 UC2 --> UC4 : Cartão selecionado
 SistemaPagBank --> UC3 : Retorna QR Code
 
-Administrador --> UC5
 Administrador --> UC6
 Administrador --> UC7
 
 UC3 .> SistemaPagBank : API call
-UC5 .> SistemaPagBank : Configuração
-
 @enduml
