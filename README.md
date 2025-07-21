@@ -64,7 +64,7 @@ Para dúvidas, sugestões ou feedbacks, entre em contato:
 > Projeto pessoal desenvolvido com fins de aprendizado e apoio à comunidade autista. 💙
 
 ## 🧱 Arquitetura do Projeto
-![Diagrama de arquitetura](docs/casodeuso.png)
+![Diagrama de arquitetura]
 
 ### Diagramas de Fluxo
 ![pix](docs/fluxopix.png)
