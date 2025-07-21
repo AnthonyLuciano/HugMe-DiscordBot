@@ -65,3 +65,6 @@ Para dúvidas, sugestões ou feedbacks, entre em contato:
 
 ## 🧱 Arquitetura do Projeto
 ![Diagrama de arquitetura](docs/casodeuso.png)
+
+### Diagramas de Fluxo
+![pix](docs/fluxopix.png)

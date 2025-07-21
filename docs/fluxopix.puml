@@ -1,0 +1,12 @@
+@startuml fluxopix
+participant Usuário
+participant Bot
+participant "API PagBank" as PagBank
+participant BancoDados
+
+Usuário -> Bot: Clica em "Pix"
+Bot -> PagBank: POST /orders (com dados doação)
+PagBank --> Bot: Resposta com QR Code
+Bot -> BancoDados: Registra transação
+Bot --> Usuário: Mostra QR Code
+@enduml
