@@ -71,6 +71,6 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 
 ## 🧱 Arquitetura do Projeto
 ![Diagrama de arquitetura](docs/casodeuso.png)
-
+> por algum motivo o documento não quer atualizar.
 ### Diagramas de Fluxo
 ![pix](docs/fluxopix.png)
