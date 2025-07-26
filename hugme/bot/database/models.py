@@ -9,6 +9,9 @@ class PixConfig(Base):
 
     id = Column(Integer, primary_key=True)
     chave = Column(String(100), nullable=False, unique=True)
+    static_qr_url = Column(String(255))
+    nome_titular = Column(String(100), nullable=False)
+    cidade = Column(String(100), nullable=False)
     atualizado_em = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     atualizado_por = Column(String(20))
 

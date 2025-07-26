@@ -1,50 +1,140 @@
-import discord, logging
+import discord
+import logging
+import os
+import httpx
+from datetime import datetime, timedelta, timezone
 from discord.ext import commands
-from discord.ui import Button, View
+from discord.ui import View, Button, Modal, TextInput
 
 logger = logging.getLogger(__name__)
 
-class DoarView(View):
-    def __init__(self, bot):
-        super().__init__(timeout=None)
-        self.bot = bot
+# --- Modal de Doação (Formulário Pix) ---
+class DonationModal(Modal, title="Fazer Doação via Pix"):
+    amount = TextInput(
+        label="Valor da Doação (R$)",
+        placeholder="Ex: 10.00",
+        required=True
+    )
+    method = TextInput(
+        label="Método de Pagamento (Digite 'Pix')",
+        placeholder="Pix",
+        required=True
+    )
 
-    @discord.ui.button(label="Pix", style=discord.ButtonStyle.primary, emoji="💰")
-    async def pix_button(self, interaction: discord.Interaction, button: Button):
+    async def on_submit(self, interaction: discord.Interaction):
         try:
-            qrcode_url = await self.bot.db.criar_qrcode_pix(
-                valor=10.00,
-                descricao="Doação para comunidade"
-            )
+            amount = float(self.amount.value)
+            method = self.method.value.lower()
+
+            if method != "pix":
+                await interaction.response.send_message(
+                    "⚠️ Atualmente só aceitamos doações via **Pix**.",
+                    ephemeral=True
+                )
+                return
+
+            reference_id = f"doacao_discord_user_{interaction.user.id}"
+            amount_cents = int(amount * 100)
+            brasilia_offset = timedelta(hours=-3)
+            brasilia_tz = timezone(brasilia_offset)
+            expiration = (datetime.now(brasilia_tz) + timedelta(days=180)).isoformat()
+
+
+            payment_data = {
+                "reference_id": reference_id,
+                "customer": {
+                    "name": str(interaction.user),
+                    "email": f"{interaction.user.id}@example.com",
+                    "tax_id": "12345678909",
+                    "phones": [
+                        {
+                            "country": "55",
+                            "area": "11",
+                            "number": "999999999",
+                            "type": "MOBILE"
+                        }
+                    ]
+                },
+                "items": [
+                    {
+                        "reference_id": "doacao_item_001",
+                        "name": "Doação Discord",
+                        "quantity": 1,
+                        "unit_amount": amount_cents
+                    }
+                ],
+                "qr_codes": [
+                    {
+                        "amount": {
+                            "value": amount_cents
+                        },
+                        "expiration_date": expiration
+                    }
+                ],
+                "notification_urls": [
+                    "https://seusite.com/pagbank-webhook"
+                ]
+            }
+
+            headers = {
+                "Authorization": f"Bearer {os.getenv('PAGBANK_API_KEY')}",
+                "Content-Type": "application/json"
+            }
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{os.getenv('PAGBANK_ENDPOINT')}/orders",
+                    json=payment_data,
+                    headers=headers
+                )
+                response.raise_for_status()
+                payment_info = response.json()
+
+            # Pega o QR Code
+            qr_code_url = payment_info["qr_codes"][0]["links"][0]["href"]
+            text_key = payment_info["qr_codes"][0]["text"]
 
             embed = discord.Embed(
-                title="📌 Doação via PIX",
-                description="Escaneie o QR Code abaixo ou use a chave PIX cadastrada",
+                title=f"💰 Doação de R${amount:.2f} via PIX",
+                description="Escaneie o QR Code ou copie o código abaixo:",
                 color=0x32CD32
             )
-            embed.set_image(url=qrcode_url)
+            embed.add_field(name="Valor", value=f"R$ {amount:.2f}", inline=True)
+            embed.add_field(name="Copia e Cola", value=f"`{text_key}`", inline=False)
+            embed.set_image(url=qr_code_url)
+
             await interaction.response.send_message(embed=embed, ephemeral=True)
+
         except Exception as e:
-            logger.error(f"Erro ao gerar QR Code: {e}")
+            logger.error(f"Erro ao processar doação: {e}")
             await interaction.response.send_message(
-                "❌ Erro ao gerar QR Code. Tente novamente mais tarde.",
+                "❌ Ocorreu um erro ao processar sua doação. Tente novamente mais tarde.",
                 ephemeral=True
             )
-    @discord.ui.button(label="Cartão", style=discord.ButtonStyle.primary, emoji="💳")
-    async def cartao_button(self, interaction: discord.Interaction, button: Button):
+
+
+# --- View com Botões ---
+class DoarView(View):
+    def __init__(self, bot):
+        super().__init__(timeout=180)
+        self.bot = bot
+
+    @discord.ui.button(label="Pix", style=discord.ButtonStyle.green, custom_id="doar_pix")
+    async def doar_pix_button(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_modal(DonationModal())
+
+    @discord.ui.button(label="Cartão (em breve)", style=discord.ButtonStyle.gray, custom_id="doar_cartao", disabled=True)
+    async def doar_cartao_button(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_message(
-            "📌 **Doação via Cartão (PayPal)**\n"
-            "Você pode fazer uma doação recorrente mensal com cartão de crédito.\n"
-            "Acesse o link abaixo para assinar:\n"
-            "[Link do PayPal](https://www.paypal.com/assinatura)\n"
-            "Após a confirmação, seu cargo será atribuído automaticamente."
+            "💳 Doações com cartão estarão disponíveis em breve!",
+            ephemeral=True
         )
 
-
+# --- Comando /doar ---
 class DoarCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-    
+
     @commands.hybrid_command(name="doar", description="Inicie o processo de doação para a comunidade")
     async def doar(self, ctx: commands.Context):
         try:
@@ -53,16 +143,16 @@ class DoarCommands(commands.Cog):
                 description=(
                     "Escolha a forma de doação:\n\n"
                     "💰 **Pix**: Doação única ou recorrente.\n"
-                    "💳 **Cartão**: Doação mensal recorrente via PayPal.\n\n"
+                    "💳 **Cartão**: Doação mensal recorrente via PagBank.\n\n"
                     "Clique nos botões abaixo para mais informações."
                 ),
                 color=discord.Color.green()
             )
             view = DoarView(self.bot)
-            await ctx.author.send(embed=embed, view=view)
-            await ctx.send("📩 Verifique sua mensagem direta (DM) para escolher a forma de doação!", ephemeral=True)
+            await ctx.send(embed=embed, view=view, ephemeral=True)
         except discord.Forbidden:
-            await ctx.send("❌ Não foi possível enviar a mensagem direta. Verifique suas configurações de privacidade!", ephemeral=True)
+            await ctx.send("❌ Não foi possível exibir os botões. Verifique suas permissões!", ephemeral=True)
 
+# --- Setup ---
 async def setup(bot):
     await bot.add_cog(DoarCommands(bot))

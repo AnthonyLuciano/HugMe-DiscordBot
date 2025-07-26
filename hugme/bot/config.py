@@ -5,7 +5,7 @@ load_dotenv()
 
 class Config:
     DISCORD_TOKEN = getenv('DISCORD_BOT_TOKEN')
-    PAGBANK_API_KEY = getenv('API_KEY')
+    PAGBANK_API_KEY = getenv('PAGBANK_API_KEY')
     DATABASE_URL = getenv('DATABASE_URL')
     APPLICATION_ID = getenv('APPLICATION_ID')
 
