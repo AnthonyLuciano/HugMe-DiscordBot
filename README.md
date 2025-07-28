@@ -20,17 +20,19 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [x] Modelo de banco de dados para apoiadores.
 - [x] Comando `/doar` com interface interativa via botão e modal.
 - [x] Envio de pedidos Pix com QR Code via API PagBank.
-- Integração com PIX: [███████░░░] **70%**
-  - [x] Envio do pedido via API
-  - [x] Geração do QR Code e chave Pix no Discord
-  - [ ] Validação de pagamento via webhook
-  - [ ] Atribuição automática de cargo
-
+- [x] Painel administrativo web básico.
+- [x] Autenticação via Discord OAuth2.
+### Integração com PIX: [███████░░░] **70%**
+- [x] Envio do pedido via API
+- [x] Geração do QR Code e chave Pix no Discord
+- [x] Webhook básico de recebimento (implementado em `main.py`)
+- [ ] Validação completa de pagamento via webhook
+- [ ] Atribuição automática de cargo
 ### Funcionalidades em andamento:
-- [ ] Webhook de notificação de pagamento
+
 - [ ] Tarefas agendadas para expiração de apoios
 - [ ] Refinamento do painel administrativo
-
+- [ ] Integração completa entre webhook e cargos
 ### Funcionalidades futuras:
 - [ ] Sistema avançado de logs/alertas
 - [ ] Configuração de CI/CD
@@ -39,7 +41,7 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [ ] Integração com Cartão de Crédito
 
 ## 🧭 Próximos Passos
-- [ ] Finalizar webhook de confirmação de pagamento Pix
+- [ ] Finalizar validação do webhook Pix (`pagbank_webhook` em `main.py`)
 - [ ] Implementar agendamentos para:
   - [ ] Verificação de expiração
   - [ ] Atualização de cargos automaticamente

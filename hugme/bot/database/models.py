@@ -1,33 +1,46 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import String, Integer, DateTime, Boolean
 from datetime import datetime, timezone
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 class PixConfig(Base):
     __tablename__ = 'pix_config'
 
-    id = Column(Integer, primary_key=True)
-    chave = Column(String(100), nullable=False, unique=True)
-    static_qr_url = Column(String(255))
-    nome_titular = Column(String(100), nullable=False)
-    cidade = Column(String(100), nullable=False)
-    atualizado_em = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    atualizado_por = Column(String(20))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chave: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    static_qr_url: Mapped[str | None] = mapped_column(String(255))
+    nome_titular: Mapped[str] = mapped_column(String(100), nullable=False)
+    cidade: Mapped[str] = mapped_column(String(100), nullable=False)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    atualizado_por: Mapped[str | None] = mapped_column(String(20))
 
 class Apoiador(Base):
     __tablename__ = 'apoiadores'
     
-    id = Column(Integer, primary_key=True)
-    discord_id = Column(String(20), unique=True, nullable=False)  # ID do usuário no Discord
-    id_pagamento = Column(String(50), unique=True)  # ID único do pagamento (pode ser usado para outros gateways)
-    tipo_apoio = Column(String(20), nullable = False) #pix ou paypal
-    comprovante_url = Column(String(255)) #URL do Comprovante
-    data_inicio = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))  # Data de início do apoio
-    ultimo_pagamento = Column(DateTime(timezone=True))  # Data do último pagamento
-    ativo = Column(Boolean, default=True)  # Status do apoio (ativo/inativo)
-    nivel = Column(Integer, default=1)  # Nível de apoio (1 a 10, por exemplo)
-    data_expiracao = Column(DateTime(timezone=True))  # Data de expiração dos benefícios
+    id: Mapped[int] = mapped_column(primary_key=True)
+    discord_id: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    guild_id: Mapped[str] = mapped_column(String(20), nullable=False)
+    id_pagamento: Mapped[str | None] = mapped_column(String(50), unique=True)
+    tipo_apoio: Mapped[str] = mapped_column(String(20), nullable=False)
+    duracao_meses: Mapped[int | None] = mapped_column(Integer)
+    comprovante_url: Mapped[str | None] = mapped_column(String(255))
+    data_inicio: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    ultimo_pagamento: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+    nivel: Mapped[int] = mapped_column(Integer, default=1)
+    data_expiracao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Apoiador(discord_id={self.discord_id}, nivel={self.nivel})>"
+
+class GuildConfig(Base):
+    __tablename__ = 'guild_configs'
+    
+    guild_id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    role_prefix: Mapped[str] = mapped_column(String(50), default="Apoia")

@@ -28,9 +28,9 @@ class VerificarCargoView(View):
 async def setup(bot):
     verificador = VerificacaoMembro(bot)
     
-    @bot.tree.command(name="verificar_cargo", description="Cria verificação de cargo (apenas staff)")
+    @bot.tree.command(name="verificarcargo", description="Cria verificação de cargo (apenas staff)")
     @discord.app_commands.checks.has_permissions(administrator=True)
-    async def verificar_cargo(interaction: discord.Interaction, cargo_id: str, tempo_minimo_dias: int = 30):
+    async def verificarcargo(interaction: discord.Interaction, cargo_id: str, tempo_minimo_dias: int = 30):
         """Comando restrito para staff criar verificação de cargo"""
         try:
             if not isinstance(interaction.channel, discord.TextChannel):

@@ -1,5 +1,7 @@
 import discord
 from datetime import datetime, timezone
+from bot.database import get_db
+from bot.database.models import Apoiador
 
 class VerificacaoMembro:
     """Classe para calcular o tempo de permanência de um membro no servidor."""
@@ -75,7 +77,7 @@ class VerificacaoMembro:
         diferenca = datetime.now(timezone.utc) - member.joined_at
         return diferenca.days >= tempo_minimo_dias
     
-    async def aplicar_cargo_se_qualificado(self, member: discord.Member, cargo_id: int, tempo_minimo_dias: int) -> str:
+    async def aplicar_cargo_se_qualificado(self, member: discord.Member, cargo_id: int, tempo_minimo_dias: int, nivel_apoio: int | None = None) -> str:
         """Tenta aplicar um cargo se o membro atender ao tempo mínimo.
         
         Args:
@@ -89,12 +91,26 @@ class VerificacaoMembro:
         cargo = member.guild.get_role(cargo_id)
         if not cargo:
             return "Cargo não encontrado!"
-        #^^pegador de excessoes    
+        #^^pegador de excessoes 
+        #logica pros apoiadores vv   
+        if nivel_apoio is not None:
+            db = next(get_db())
+            apoiador = db.query(Apoiador).filter(
+                Apoiador.discord_id == str(member.id),
+                Apoiador.guild_id == str(member.guild.id),
+                Apoiador.ativo == True,
+                Apoiador.nivel >= nivel_apoio
+            ).first()
+
+            if apoiador:
+                await member.add_roles(cargo)
+                return f"Cargo de apoiador {cargo.name} aplicado!"
+            return "Você não é um apoiador qualificado"
+        
         if await self.verificar_tempo_minimo(member, tempo_minimo_dias):
             await member.add_roles(cargo)
-            return f"Cargo {cargo.name} aplicado com sucesso!"
-        #^^adiciona cargo quando verificado
-        else:
             tempo_atual = await self.tempo_servidor(member)
-            return f"Você precisa de {tempo_minimo_dias} dias no servidor (atual: {tempo_atual})"
-        #^^se nao poder ser verificado, avisa quando pode
+            f"Cargo {cargo.name} aplicado com sucesso!"
+        else:    
+            return f"Precisa de {tempo_minimo_dias} dias (atual: {tempo_atual})" # type: ignore
+        return "Você ainda não atende aos critérios necessários para receber o cargo."

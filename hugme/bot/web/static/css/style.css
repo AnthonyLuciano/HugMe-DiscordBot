@@ -36,3 +36,20 @@ nav a {
 nav a:hover {
     text-decoration: underline;
 }
+
+.status-active { color: green; }
+.status-expired { color: red; }
+
+.metric-card {
+    border: 1px solid #ddd;
+    padding: 1rem;
+    margin: 1rem;
+    border-radius: 5px;
+    display: inline-block;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}

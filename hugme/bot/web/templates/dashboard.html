@@ -3,18 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
+    <title>Painel Principal</title>
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="container">
-        <h1>Dashboard</h1>
+        <h1>Painel Principal</h1>
         <p>Bem-vindo, {{ user.username }}!</p>
         <nav>
             <a href="/servers">Servidores</a>
             <a href="/commands">Comandos</a>
+            {% if user.admin %}
+                <a href="/admin">Admin</a>
+            {% endif %}
         </nav>
+        
         <h2>Apoiadores</h2>
         <table>
             <thead>
@@ -22,6 +26,7 @@
                     <th>ID Discord</th>
                     <th>Tipo de Apoio</th>
                     <th>Status</th>
+                    <th>Expiração</th>
                 </tr>
             </thead>
             <tbody>
@@ -29,7 +34,17 @@
                 <tr>
                     <td>{{ apoiador.discord_id }}</td>
                     <td>{{ apoiador.tipo_apoio }}</td>
-                    <td>{{ "Ativo" if apoiador.ativo else "Inativo" }}</td>
+                    <td class="status-{{ 'ativo' if apoiador.ativo else 'inativo' }}">
+                        {{ "Ativo" if apoiador.ativo else "Inativo" }}
+                    </td>
+                    <td>
+                        {% if apoiador.data_expiracao %}
+                            {{ (apoiador.data_expiracao - now).days }} dias
+                            ({{ apoiador.data_expiracao.strftime('%d/%m/%Y') }})
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

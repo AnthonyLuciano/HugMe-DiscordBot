@@ -20,11 +20,25 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
         placeholder="Pix",
         required=True
     )
+    email = TextInput(
+        label="Seu Email",
+        placeholder="email@exemplo.com",
+        required=True
+    )
+    phone = TextInput(
+        label="Teleone (Com DDD)",
+        placeholder="11999999999",
+        required=True,
+        min_length=11,
+        max_length=11,
+    )
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
             amount = float(self.amount.value)
             method = self.method.value.lower()
+            phone = self.phone.value
+            email = self.email.value
 
             if method != "pix":
                 await interaction.response.send_message(
@@ -44,13 +58,13 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                 "reference_id": reference_id,
                 "customer": {
                     "name": str(interaction.user),
-                    "email": f"{interaction.user.id}@example.com",
+                    "email": email,
                     "tax_id": "12345678909",
                     "phones": [
                         {
                             "country": "55",
-                            "area": "11",
-                            "number": "999999999",
+                            "area": phone[:2],
+                            "number": phone[2:],
                             "type": "MOBILE"
                         }
                     ]
@@ -113,22 +127,99 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
             )
 
 
-# --- View com Botões ---
 class DoarView(View):
     def __init__(self, bot):
         super().__init__(timeout=180)
         self.bot = bot
+        self.ngrok_url = os.getenv('REDIRECT_URL')
 
     @discord.ui.button(label="Pix", style=discord.ButtonStyle.green, custom_id="doar_pix")
     async def doar_pix_button(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_modal(DonationModal())
 
-    @discord.ui.button(label="Cartão (em breve)", style=discord.ButtonStyle.gray, custom_id="doar_cartao", disabled=True)
+    @discord.ui.button(label="Cartão", style=discord.ButtonStyle.blurple, custom_id="doar_cartao", disabled=False)
     async def doar_cartao_button(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.send_message(
-            "💳 Doações com cartão estarão disponíveis em breve!",
-            ephemeral=True
-        )
+        try:
+            checkout_data = {
+                "reference_id": f"card_checkout_{interaction.user.id}",
+                "customer": {
+                    "name": str(interaction.user),
+                    "email": f"{interaction.user.id}@temp.com",
+                    "tax_id": "12345678909"
+                },
+                "items": [{
+                    "reference_id": "doacao_001",
+                    "name": "Doação Discord",
+                    "quantity": 1,
+                    "unit_amount": 1000
+                }],
+                "payment_methods": [{
+                    "type": "CREDIT_CARD",
+                    "brands": ["VISA", "MASTERCARD"]
+                }],
+                "redirect_url": f"{self.ngrok_url}/obrigado",
+                "notification_urls": [f"{self.ngrok_url}/webhook"]
+            }
+
+            headers = {
+                "Authorization": f"Bearer {os.getenv('PAGBANK_API_KEY')}",
+                "Content-Type": "application/json",
+                "x-api-version": "4.0"
+            }
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{os.getenv('PAGBANK_ENDPOINT')}/checkouts",
+                    json=checkout_data,
+                    headers=headers
+                )
+
+                logger.info(f"Request: {checkout_data}")
+                logger.info(f"Response: {response.text}")
+
+                response.raise_for_status()
+                checkout_info = response.json()
+
+                payment_url = next(
+                    (link['href'] for link in checkout_info['links'] if link['rel'] == 'PAY'),
+                    None
+                )
+
+                if not payment_url:
+                    raise ValueError("URL de pagamento não encontrada na resposta")
+
+            embed = discord.Embed(
+                title="💳 Doação com Cartão",
+                description="Clique no botão abaixo para finalizar seu pagamento:",
+                color=0x3498db
+            )
+            embed.set_footer(text="Você será redirecionado para o PagBank.")
+
+            class PagamentoView(View):
+                def __init__(self, url: str):
+                    super().__init__(timeout=None)
+                    self.add_item(Button(
+                        label="Finalizar Pagamento",
+                        style=discord.ButtonStyle.link,
+                        url=url
+                    ))
+
+            view = PagamentoView(payment_url)
+
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Erro HTTP: {e.response.text}")
+            await interaction.response.send_message(
+                f"❌ Erro no PagBank: {e.response.json().get('error_message', 'Verifique os logs')}",
+                ephemeral=True
+            )
+        except Exception as e:
+            logger.error(f"Erro geral: {str(e)}", exc_info=True)
+            await interaction.response.send_message(
+                "❌ Erro interno ao processar pagamento",
+                ephemeral=True
+            )
 
 # --- Comando /doar ---
 class DoarCommands(commands.Cog):
@@ -149,7 +240,7 @@ class DoarCommands(commands.Cog):
                 color=discord.Color.green()
             )
             view = DoarView(self.bot)
-            await ctx.send(embed=embed, view=view, ephemeral=True)
+            await ctx.send(embed=embed, view=view)
         except discord.Forbidden:
             await ctx.send("❌ Não foi possível exibir os botões. Verifique suas permissões!", ephemeral=True)
 

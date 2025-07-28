@@ -3,20 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel Administrativo</title>
+    <title>Painel Admin</title>
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="container">
         <h1>Painel Administrativo</h1>
+        
+        <div class="metricas">
+            <div class="metrica">
+                <h3>Total de Doações</h3>
+                <p>{{ metricas.total_donations }}</p>
+            </div>
+            <div class="metrica">
+                <h3>Apoiadores Ativos</h3>
+                <p>{{ metricas.active_supporters }}</p>
+            </div>
+            <div class="metrica">
+                <h3>Expirados</h3>
+                <p>{{ metricas.expired_supporters }}</p>
+            </div>
+            <div class="metrica">
+                <h3>Taxa de Renovação</h3>
+                <p>{{ metricas.renewal_rate }}%</p>
+            </div>
+        </div>
+
+        <h2>Lista Completa de Apoiadores</h2>
         <table>
             <thead>
                 <tr>
                     <th>ID Discord</th>
-                    <th>Tipo de Apoio</th>
+                    <th>Tipo</th>
                     <th>Status</th>
-                    <th>Ações</th>
+                    <th>Último Pagamento</th>
+                    <th>Expiração</th>
+                    <th>Dias Restantes</th>
                 </tr>
             </thead>
             <tbody>
@@ -24,15 +47,34 @@
                 <tr>
                     <td>{{ apoiador.discord_id }}</td>
                     <td>{{ apoiador.tipo_apoio }}</td>
-                    <td>{{ "Ativo" if apoiador.ativo else "Inativo" }}</td>
+                    <td class="status-{{ 'ativo' if apoiador.ativo else 'inativo' }}">
+                        {{ "Ativo" if apoiador.ativo else "Inativo" }}
+                    </td>
                     <td>
-                        <a href="/apoiador/{{ apoiador.discord_id }}">Detalhes</a>
+                        {% if apoiador.ultimo_pagamento %}
+                            {{ apoiador.ultimo_pagamento.strftime('%d/%m/%Y') }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if apoiador.data_expiracao %}
+                            {{ apoiador.data_expiracao.strftime('%d/%m/%Y') }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if apoiador.data_expiracao %}
+                            {{ (apoiador.data_expiracao - now).days }} dias
+                        {% else %}
+                            -
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    <script src="/static/js/script.js"></script>
 </body>
 </html>
