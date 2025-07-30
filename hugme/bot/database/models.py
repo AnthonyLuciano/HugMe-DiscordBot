@@ -35,6 +35,7 @@ class Apoiador(Base):
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     nivel: Mapped[int] = mapped_column(Integer, default=1)
     data_expiracao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cargo_atribuido: Mapped[bool] = mapped_column(Boolean, default=False)  # New field for role assignment status
 
     def __repr__(self) -> str:
         return f"<Apoiador(discord_id={self.discord_id}, nivel={self.nivel})>"
@@ -44,3 +45,5 @@ class GuildConfig(Base):
     
     guild_id: Mapped[str] = mapped_column(String(20), primary_key=True)
     role_prefix: Mapped[str] = mapped_column(String(50), default="Apoia")
+    cargo_apoiador_id: Mapped[str | None] = mapped_column(String(20))  # New field for role ID
+    webhook_failures: Mapped[int] = mapped_column(Integer, default=0)  # Failure counter

@@ -1,26 +1,31 @@
+from queue import Queue
 from datetime import datetime, timedelta, timezone
-
+from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from bot.config import config as app_config
 from fastapi import FastAPI, Header, Request, Depends, HTTPException, APIRouter
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlalchemy.orm import Session
+from bot.config import config as app_config
 from bot.database import SessionLocal
 from bot.database import get_db
-from bot.database.models import Apoiador
+from bot.database.models import Apoiador, GuildConfig
+from bot.servicos.VerificacaoMembro import VerificacaoMembro
 from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
-import httpx, os, logging, asyncio, hmac, hashlib
+import httpx, os, logging, asyncio, hmac, hashlib, threading
+
+from bot.shared import get_bot_instance
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 router = APIRouter()
-
+bot = get_bot_instance()
 
 DISCORD_CLIENT_ID = os.getenv('DISCORD_CLIENT_ID')
 DISCORD_CLIENT_SECRET = os.getenv('DISCORD_CLIENT_SECRET')
@@ -54,6 +59,138 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 templates_dir = os.path.join(os.path.dirname(__file__), "templates")
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates = Jinja2Templates(directory=templates_dir)
+
+retry_queue = Queue()
+
+def retry_worker():
+    while True:
+        task = retry_queue.get()
+        if task is None:
+            break
+        try:
+            # Execute the task with retry logic
+            for attempt in range(3):
+                try:
+                    task()
+                    break
+                except Exception as e:
+                    if attempt == 2:
+                        logger.error(f"Retry failed: {str(e)}")
+        finally:
+            retry_queue.task_done()
+
+# Start worker thread when module loads
+worker_thread = threading.Thread(target=retry_worker)
+worker_thread.daemon = True
+worker_thread.start()
+
+async def verify_webhook_signature(request: Request, body: bytes) -> bool:
+    if not app_config.WEBHOOK_SECRET:
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+    
+    signature = request.headers.get("x-pagbank-signature")
+    if not signature:
+        return False
+        
+    digest = hmac.new(
+        app_config.WEBHOOK_SECRET.encode(), 
+        body, 
+        hashlib.sha256
+    ).hexdigest()
+    
+    
+
+    return hmac.compare_digest(digest, signature)
+async def pagbank_webhook(request: Request):
+    try:
+        body = await request.body()
+        if not await verify_webhook_signature(request, body):
+            raise HTTPException(status_code=403, detail="invalid signature")
+        
+        data = await request.json()
+        logger.info(f"Full webhook data: {data}")  # Log full payload
+        
+        event_type = data.get("event")
+        charge = data.get("charge", {})
+        charge_status = charge.get("status", "").upper() if charge else ""
+
+        # Debug logging with more details
+        logger.info(f"Received event: {event_type}, status: {charge_status}")
+        logger.info(f"Reference ID: {charge.get('reference_id')}")
+
+        # More flexible status check
+        if event_type != "PAYMENT_RECEIVED" or charge_status != "PAID":
+            logger.warning(f"Ignoring event - reason: "
+                           f"event_type_match={event_type == 'PAYMENT_RECEIVED'}, "
+                           f"status_match={charge_status == 'PAID'}")
+            return {"status": "ignored"}
+        
+        # ... rest of the function remains the same ...
+        
+        reference_id = charge.get("reference_id")
+        if not reference_id:
+            raise HTTPException(status_code=400, detail="Missing reference_id")
+        
+        with SessionLocal() as session:
+            apoiador = session.query(Apoiador).filter_by(id_pagamento=reference_id).first()
+            if not apoiador:
+                logger.warning(f"Pagamento não vinculado: {reference_id}")
+                return {"status": "apoiador_not_found"}
+            
+            apoiador.ultimo_pagamento = datetime.now(timezone.utc)
+            apoiador.data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
+            apoiador.ativo = True
+            
+            # Get guild config
+            guild_config = session.query(GuildConfig).filter_by(guild_id=apoiador.guild_id).first()
+            if guild_config and guild_config.cargo_apoiador_id:
+                try:
+                    verificador = VerificacaoMembro(bot)
+                    success = await verificador.atribuir_cargo_apos_pagamento(
+                        apoiador.discord_id,
+                        int(apoiador.guild_id),
+                        int(guild_config.cargo_apoiador_id)
+                    )
+                    if success:
+                        apoiador.cargo_atribuido = True
+                        logger.info(f"Cargo atribuído: {apoiador.discord_id}")
+                except Exception as e:
+                    logger.error(f"Erro ao atribuir cargo: {str(e)}")
+                    # Increment failure counter
+                    if guild_config:
+                        guild_config.webhook_failures += 1
+            
+            session.commit()
+            return {"status": "success"}
+    
+    except Exception as e:
+        logger.error(f"Webhook error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+security = HTTPBearer()
+
+async def get_current_admin(credentals: HTTPAuthorizationCredentials = Depends(security)):
+    if credentals.credentials != app_config.ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="invalid perimieter")
+    return True
+
+def check_expirations():
+    with SessionLocal() as session:
+        now = datetime.now(timezone.utc)
+        expired = session.query(Apoiador).filter(
+            Apoiador.data_expiracao < now,
+            Apoiador.ativo == True
+        ).all()
+        for apoiador in expired:
+            apoiador.ativo = False
+            logger.info(f"Apoiador expirado: {apoiador.discord_id}")
+        
+        session.commit()
+
+#inicia schedule quando começa o app
+scheduler = BackgroundScheduler()
+scheduler.add_job(check_expirations, 'interval', hours=6)
+scheduler.start()
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -196,56 +333,6 @@ async def commands(request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="Não autenticado")
 
-async def verify_webhook_signature(request: Request, body: bytes) -> bool:
-    if not app_config.WEBHOOK_SECRET:
-        raise HTTPException(status_code=500, detail="Webhook secret not configured")
-    
-    signature = request.headers.get("x-pagbank-signature")
-    if not signature:
-        return False
-        
-    digest = hmac.new(
-        app_config.WEBHOOK_SECRET.encode(), 
-        body, 
-        hashlib.sha256
-    ).hexdigest()
-    
-    return hmac.compare_digest(digest, signature)
-async def pagbank_webhook(request: Request):
-    try:
-        # Get raw body for HMAC verification
-        body = await request.body()
-        
-        # Verify signature
-        if not await verify_webhook_signature(request, body):
-            raise HTTPException(status_code=403, detail="Invalid signature")
-
-        data = await request.json()
-        reference_id = data.get("reference_id")
-        
-        with SessionLocal() as session:
-            apoiador = session.query(Apoiador).filter_by(id_pagamento=reference_id).first()
-            if not apoiador:
-                raise HTTPException(status_code=404, detail="Apoiador not found")
-
-            # Update supporter status
-            apoiador.ultimo_pagamento = datetime.now(timezone.utc)
-            apoiador.data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
-            apoiador.ativo = True
-            session.commit()
-
-        return {"status": "success"}
-    except Exception as e:
-        logger.error(f"Webhook error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-    
-security = HTTPBearer()
-
-async def get_current_admin(credentals: HTTPAuthorizationCredentials = Depends(security)):
-    if credentals.credentials != app_config.ADMIN_TOKEN:
-        raise HTTPException(status_code=403, detail="invalid perimieter")
-    return True
-
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_panel(
     request: Request,
@@ -276,7 +363,8 @@ async def admin_panel(
         "request": request,
         "metricas": metricas,
         "apoiadores": apoiadores,
-        "now": datetime.now(timezone.utc)
+        "now": datetime.now(timezone.utc),
+        "app_config": app_config
     })
 
 @app.get("/admin/metrics", dependencies=[Depends(get_current_admin)])
@@ -287,9 +375,49 @@ async def admin_metric():
         expired = session.query(Apoiador).filter(
             Apoiador.data_expiracao < datetime.now(timezone.utc)
         ).count()
+        pending_roles = session.query(Apoiador).filter_by(
+            ativo=True, cargo_atribuido=False
+        ).count()
+        
+        webhook_failures = session.query(func.sum(GuildConfig.webhook_failures)).scalar() or 0
+        
         return {
             "total_donations": total,
             "active_supporters": active,
             "expired_supporters": expired,
+            "pending_role_assignments": pending_roles,
+            "webhook_failure_count": webhook_failures,
             "renewal_rate": round((active / total) * 100, 2) if total else 0
         }
+
+@app.post("/admin/set-role", dependencies=[Depends(get_current_admin)])
+async def set_supporter_role(request: Request, db: Session = Depends(get_db)):
+    data = await request.json()
+    guild_id = data.get("guild_id")
+    role_id = data.get("role_id")
+
+    if not guild_id or not role_id:
+        raise HTTPException(status_code=400, detail="Missing guild_id or role_id")
+    with SessionLocal() as session:
+        guild_config = session.query(GuildConfig).filter_by(guild_id=guild_id).first()
+        if not guild_config:
+            guild_config = GuildConfig(guild_id=guild_id, cargo_apoiador_id=role_id)
+        else:
+            guild_config.cargo_apoiador_id = role_id
+        
+        session.add(guild_config)
+        session.commit()
+    
+    return {"status": "success", "guild_id": guild_id, "role_id": role_id}
+    
+
+@app.post("/pagbank-webhook")
+async def handle_pagbank_webhook(request: Request):
+    return await pagbank_webhook(request)
+
+# Adicionar esta rota para compatibilidade com notificações antigas
+
+@app.post("/webhook")
+async def legacy_webhook(request: Request):
+    logger.warning("Legacy webhook endpoint called, redirecting to pagbank-webhook")
+    return await pagbank_webhook(request)

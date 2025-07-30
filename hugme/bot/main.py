@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from discord.ext import commands
 from dotenv import load_dotenv
 from bot.database import Base, engine
-from bot.database.models import Base, PixConfig
+from bot.database.models import Apoiador, Base, PixConfig
+from bot.shared import set_bot_instance
 
 # Configuração básica de logging
 logging.basicConfig(
@@ -67,13 +68,20 @@ class DatabaseManager:
             except httpx.HTTPStatusError as e:
                 logger.error(f"Erro PagBank [{e.response.status_code}]: {e.response.text}")
                 raise
-
+    def obter_apoiador(self, discord_id: str, guild_id: str) -> Apoiador | None:
+        """Obtém um apoiador pelo Discord ID e Guild ID"""
+        with Session(engine) as session:
+            return session.query(Apoiador).filter(
+                Apoiador.discord_id == discord_id,
+                Apoiador.guild_id == guild_id
+            ).first()
 
 class HugMeBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
+        self.db = DatabaseManager()
         super().__init__(
             command_prefix='!',  # Mantém prefixo para comandos tradicionais
             intents=discord.Intents.all(),
@@ -121,6 +129,7 @@ class HugMeBot(commands.Bot):
 # Cria e executa o bot
 if __name__ == '__main__':
     bot = HugMeBot()
+    set_bot_instance(bot)
     
     @bot.event
     async def on_ready():

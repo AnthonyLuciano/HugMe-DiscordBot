@@ -12,7 +12,7 @@ class Config:
     PAGBANK_EMAIL = getenv('PAGBANK_EMAIL')
 
     # Webhook and security settings
-    WEBHOOK_SECRET = getenv('WEBHOOK_SECRET', '')
+    WEBHOOK_SECRET = getenv('WEBHOOK_SECRET')
     ADMIN_TOKEN = getenv('ADMIN_TOKEN', '')
 
     # Environment detection

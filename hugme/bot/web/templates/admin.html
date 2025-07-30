@@ -12,6 +12,7 @@
         <h1>Painel Administrativo</h1>
         
         <div class="metricas">
+            <!-- Métricas existentes -->
             <div class="metrica">
                 <h3>Total de Doações</h3>
                 <p>{{ metricas.total_donations }}</p>
@@ -28,6 +29,16 @@
                 <h3>Taxa de Renovação</h3>
                 <p>{{ metricas.renewal_rate }}%</p>
             </div>
+            
+            <!-- Novas métricas -->
+            <div class="metrica warning">
+                <h3>Cargos Pendentes</h3>
+                <p>{{ metricas.pending_role_assignments }}</p>
+            </div>
+            <div class="metrica danger">
+                <h3>Falhas Webhook</h3>
+                <p>{{ metricas.webhook_failure_count }}</p>
+            </div>
         </div>
 
         <h2>Lista Completa de Apoiadores</h2>
@@ -35,17 +46,19 @@
             <thead>
                 <tr>
                     <th>ID Discord</th>
+                    <th>Servidor</th>
                     <th>Tipo</th>
                     <th>Status</th>
                     <th>Último Pagamento</th>
                     <th>Expiração</th>
-                    <th>Dias Restantes</th>
+                    <th>Cargo Atribuído</th>
                 </tr>
             </thead>
             <tbody>
                 {% for apoiador in apoiadores %}
                 <tr>
                     <td>{{ apoiador.discord_id }}</td>
+                    <td>{{ apoiador.guild_id }}</td>
                     <td>{{ apoiador.tipo_apoio }}</td>
                     <td class="status-{{ 'ativo' if apoiador.ativo else 'inativo' }}">
                         {{ "Ativo" if apoiador.ativo else "Inativo" }}
@@ -65,16 +78,62 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if apoiador.data_expiracao %}
-                            {{ (apoiador.data_expiracao - now).days }} dias
+                        {% if apoiador.cargo_atribuido %}
+                            ✅ Sim
                         {% else %}
-                            -
+                            ❌ Não
                         {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+
+        <!-- Nova seção para configuração de cargos -->
+        <h2>Configurar Cargo de Apoiador</h2>
+        <form id="roleConfigForm">
+            <div>
+                <label for="guild_id">ID do Servidor:</label>
+                <input type="text" id="guild_id" name="guild_id" required>
+            </div>
+            <div>
+                <label for="role_id">ID do Cargo:</label>
+                <input type="text" id="role_id" name="role_id" required>
+            </div>
+            <button type="submit">Salvar Configuração</button>
+        </form>
     </div>
+
+    <script>
+        document.getElementById('roleConfigForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                guild_id: document.getElementById('guild_id').value,
+                role_id: document.getElementById('role_id').value
+            };
+            
+            try {
+                const response = await fetch('/admin/set-role', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer {{ app_config.ADMIN_TOKEN }}'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    alert(`Configuração salva! Servidor: ${result.guild_id}, Cargo: ${result.role_id}`);
+                } else {
+                    alert(`Erro: ${result.detail || 'Falha ao salvar configuração'}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Erro na comunicação com o servidor');
+            }
+        });
+    </script>
 </body>
 </html>

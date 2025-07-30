@@ -1,13 +1,21 @@
-import discord
+import discord, logging
 from datetime import datetime, timezone
-from bot.database import get_db
+from bot.database import engine
 from bot.database.models import Apoiador
+from sqlalchemy.orm import Session
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class VerificacaoMembro:
     """Classe para calcular o tempo de permanência de um membro no servidor."""
 
     def __init__(self, bot):
         self.bot = bot
+        self.db = bot.db
 
     async def tempo_servidor(self, member: discord.Member) -> str:
         """Calcula o tempo de permanência de um membro no servidor e retorna uma string formatada.
@@ -77,40 +85,61 @@ class VerificacaoMembro:
         diferenca = datetime.now(timezone.utc) - member.joined_at
         return diferenca.days >= tempo_minimo_dias
     
+    async def obter_apoiador(self, discord_id: str, guild_id: str) -> Apoiador | None:
+        """Obtém um apoiador pelo Discord ID e Guild ID"""
+        return self.db.obter_apoiador(discord_id, guild_id)
+
+
     async def aplicar_cargo_se_qualificado(self, member: discord.Member, cargo_id: int, tempo_minimo_dias: int, nivel_apoio: int | None = None) -> str:
-        """Tenta aplicar um cargo se o membro atender ao tempo mínimo.
-        
-        Args:
-            member: Membro a verificar
-            cargo_id: ID do cargo a aplicar
-            tempo_minimo_dias: Tempo mínimo em dias
-            
-        Returns:
-            str: Mensagem com o resultado
-        """
         cargo = member.guild.get_role(cargo_id)
         if not cargo:
             return "Cargo não encontrado!"
-        #^^pegador de excessoes 
-        #logica pros apoiadores vv   
-        if nivel_apoio is not None:
-            db = next(get_db())
-            apoiador = db.query(Apoiador).filter(
-                Apoiador.discord_id == str(member.id),
-                Apoiador.guild_id == str(member.guild.id),
-                Apoiador.ativo == True,
-                Apoiador.nivel >= nivel_apoio
-            ).first()
-
-            if apoiador:
-                await member.add_roles(cargo)
-                return f"Cargo de apoiador {cargo.name} aplicado!"
-            return "Você não é um apoiador qualificado"
         
-        if await self.verificar_tempo_minimo(member, tempo_minimo_dias):
+        try:
+            apoiador = await self.obter_apoiador(str(member.id), str(member.guild.id))
+            
+            if nivel_apoio is not None:
+                if apoiador and apoiador.ativo and apoiador.nivel >= nivel_apoio:
+                    await member.add_roles(cargo)
+                    return f"Cargo de apoiador {cargo.name} aplicado!"
+                return "Você não é um apoiador qualificado"
+            
+            if await self.verificar_tempo_minimo(member, tempo_minimo_dias):
+                await member.add_roles(cargo)
+                tempo_atual = await self.tempo_servidor(member)
+                return f"Cargo {cargo.name} aplicado com sucesso! (Tempo: {tempo_atual})"
+            else:    
+                tempo_atual = await self.tempo_servidor(member)
+                return f"Precisa de {tempo_minimo_dias} dias (atual: {tempo_atual})"
+        except Exception as e:
+            logger.error(f"Erro ao verificar apoiador: {e}")
+            return "Erro ao verificar status"
+
+    async def atribuir_cargo_apos_pagamento(self, discord_id: str, guild_id: int, cargo_id: int) -> bool:
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            return False
+        
+        member = guild.get_member(int(discord_id))
+        if not member:
+            return False
+        
+        cargo = guild.get_role(cargo_id)
+        if not cargo:
+            return False
+        
+        try:
             await member.add_roles(cargo)
-            tempo_atual = await self.tempo_servidor(member)
-            f"Cargo {cargo.name} aplicado com sucesso!"
-        else:    
-            return f"Precisa de {tempo_minimo_dias} dias (atual: {tempo_atual})" # type: ignore
-        return "Você ainda não atende aos critérios necessários para receber o cargo."
+        
+        # Atualiza o status no banco de dados
+            apoiador = await self.obter_apoiador(discord_id, str(guild_id))
+            if apoiador:
+                apoiador.cargo_atribuido = True
+                with Session(engine) as session:
+                    session.add(apoiador)
+                    session.commit()
+        
+            return True
+        except Exception as e:
+            logger.error(f"Erro ao atribuir cargo: {e}")
+            return False

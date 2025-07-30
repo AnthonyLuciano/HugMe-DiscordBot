@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 # --- Modal de Doação (Formulário Pix) ---
 class DonationModal(Modal, title="Fazer Doação via Pix"):
+    def __init__(self):
+        self.ngrok_url = os.getenv('REDIRECT_URL')
     amount = TextInput(
         label="Valor da Doação (R$)",
         placeholder="Ex: 10.00",
@@ -39,13 +41,6 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
             method = self.method.value.lower()
             phone = self.phone.value
             email = self.email.value
-
-            if method != "pix":
-                await interaction.response.send_message(
-                    "⚠️ Atualmente só aceitamos doações via **Pix**.",
-                    ephemeral=True
-                )
-                return
 
             reference_id = f"doacao_discord_user_{interaction.user.id}"
             amount_cents = int(amount * 100)
@@ -85,9 +80,7 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                         "expiration_date": expiration
                     }
                 ],
-                "notification_urls": [
-                    "https://seusite.com/pagbank-webhook"
-                ]
+                "notification_urls": [f"{self.ngrok_url}/pagbank-webhook"]
             }
 
             headers = {
@@ -158,7 +151,8 @@ class DoarView(View):
                     "brands": ["VISA", "MASTERCARD"]
                 }],
                 "redirect_url": f"{self.ngrok_url}/obrigado",
-                "notification_urls": [f"{self.ngrok_url}/webhook"]
+                "notification_urls": [f"{self.ngrok_url}/pagbank-webhook"],
+                "payment_notification_urls": [f"{self.ngrok_url}pagbank-webhook"]
             }
 
             headers = {
@@ -220,6 +214,7 @@ class DoarView(View):
                 "❌ Erro interno ao processar pagamento",
                 ephemeral=True
             )
+
 
 # --- Comando /doar ---
 class DoarCommands(commands.Cog):
