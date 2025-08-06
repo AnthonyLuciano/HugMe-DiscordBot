@@ -28,14 +28,20 @@ class Apoiador(Base):
     tipo_apoio: Mapped[str] = mapped_column(String(20), nullable=False)
     duracao_meses: Mapped[int | None] = mapped_column(Integer)
     comprovante_url: Mapped[str | None] = mapped_column(String(255))
-    data_inicio: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
-    )
+    data_inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     ultimo_pagamento: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     nivel: Mapped[int] = mapped_column(Integer, default=1)
     data_expiracao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    cargo_atribuido: Mapped[bool] = mapped_column(Boolean, default=False)  # New field for role assignment status
+    cargo_atribuido: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Campos adicionais para pagamentos
+    valor_doacao: Mapped[int | None] = mapped_column(Integer)  # Em centavos
+    email_doador: Mapped[str | None] = mapped_column(String(100))
+    cpf_doador: Mapped[str | None] = mapped_column(String(14))
+    telefone_doador: Mapped[str | None] = mapped_column(String(20))
+    data_pagamento: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    metodo_pagamento: Mapped[str | None] = mapped_column(String(20))
 
     def __repr__(self) -> str:
         return f"<Apoiador(discord_id={self.discord_id}, nivel={self.nivel})>"

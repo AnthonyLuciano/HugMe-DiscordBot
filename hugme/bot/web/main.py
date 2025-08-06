@@ -137,6 +137,10 @@ async def pagbank_webhook(request: Request):
                 logger.warning(f"Pagamento não vinculado: {reference_id}")
                 return {"status": "apoiador_not_found"}
             
+             # Atualizar informações do pagamento
+            apoiador.valor_doacao = charge.get("amount", {}).get("value")
+            apoiador.metodo_pagamento = "pix"
+            apoiador.data_pagamento = datetime.now(timezone.utc)
             apoiador.ultimo_pagamento = datetime.now(timezone.utc)
             apoiador.data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
             apoiador.ativo = True
@@ -421,3 +425,64 @@ async def handle_pagbank_webhook(request: Request):
 async def legacy_webhook(request: Request):
     logger.warning("Legacy webhook endpoint called, redirecting to pagbank-webhook")
     return await pagbank_webhook(request)
+
+from fastapi import Request, HTTPException
+from datetime import datetime, timedelta, timezone
+import logging
+
+logger = logging.getLogger(__name__)
+
+@app.post("/kofi-webhook")
+async def handle_kofi_webhook(request: Request):
+    try:
+        body = await request.body()
+        if not await verify_webhook_signature(request, body):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+        
+        data = await request.json()
+        logger.info(f"Received Ko-fi webhook: {data}")
+        
+        # Lógica para processar a notificação do Ko-fi
+        reference_id = data.get("kofi_transaction_id")
+        if not reference_id:
+            raise HTTPException(status_code=400, detail="Missing kofi_transaction_id")
+        
+        with SessionLocal() as session:
+            apoiador = session.query(Apoiador).filter_by(id_pagamento=reference_id).first()
+            if not apoiador:
+                logger.warning(f"Payment not linked: {reference_id}")
+                return {"status": "apoiador_not_found"}
+            
+            apoiador.ultimo_pagamento = datetime.now(timezone.utc)
+            apoiador.data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
+            apoiador.ativo = True
+            
+            guild_config = session.query(GuildConfig).filter_by(guild_id=apoiador.guild_id).first()
+            if guild_config and guild_config.cargo_apoiador_id:
+                try:
+                    verificador = VerificacaoMembro(bot)
+                    success = await verificador.atribuir_cargo_apos_pagamento(
+                        apoiador.discord_id,
+                        int(apoiador.guild_id),
+                        int(guild_config.cargo_apoiador_id)
+                    )
+                    if success:
+                        apoiador.cargo_atribuido = True
+                        logger.info(f"Cargo assigned: {apoiador.discord_id}")
+                except Exception as e:
+                    logger.error(f"Error assigning role: {str(e)}")
+                    if guild_config:
+                        guild_config.webhook_failures += 1
+            
+            session.commit()
+            return {"status": "success"}
+
+    except Exception as e:
+        logger.error(f"Ko-fi webhook error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def verify_kofi_webhook_signature(request: Request, body: bytes) -> bool:
+    if not app_config.WEBHOOK_SECRET:
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+    
+    signature = request.headers.get("x-ko-signature")

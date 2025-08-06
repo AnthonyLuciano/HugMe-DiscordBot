@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 class DatabaseManager:
+    #json de testes pelamor de deus nao use no prod 🙏🙏🙏
     async def criar_qrcode_pix(self, valor: float, descricao: str):
         headers = {
             "Authorization": f"Bearer {os.getenv('PAGBANK_API_KEY')}",

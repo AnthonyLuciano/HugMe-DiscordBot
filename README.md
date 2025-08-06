@@ -4,14 +4,14 @@
 
 ## 📌 Descrição
 O HugMe é uma aplicação backend escrita em **Python**, que oferece:
-- Integração com comprovantes de doação via **PIX (Mercado Pago)** e **cartão de crédito** para gerenciamento de apoios
+- Integração com comprovantes de doação via **PIX** e **cartão de crédito** para gerenciamento de apoios
 - Persistência das informações de apoiadores e doações em um banco **PostgreSQL**
 - Automatização da atribuição de cargos no Discord com base no tempo e nível de apoio
 - Painel web administrativo (futuramente) para gerenciamento e visualização dos dados
 - Suporte a pagamentos únicos e assinaturas recorrentes
 
 ## 🚧 Status do Projeto
-**Este projeto está em HIATUS:**
+**Este projeto está em Desenvolvimento:**
 *migração de sistemas*
 
 
@@ -25,16 +25,16 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [x] Painel administrativo web básico
 - [x] Autenticação via Discord OAuth2
 
-### Integração com Pagamentos: [██████░░░░] **60%**
-#### PIX via Mercado Pago:
-- [x] Configuração da API Mercado Pago
+### Integração [█████████░] **90%**
+#### PIX via:
+- [x] Configuração da API 
 - [x] Geração de QR Code dinâmico
 - [x] Sistema básico de webhooks
-- [ ] Validação completa de pagamento via webhook
+- [x] Validação completa de pagamento via webhook
 - [ ] Atribuição automática de cargo
-
+### Integração [███░░░░░░░] **30%**
 #### Cartão de Crédito:
-- [ ] Implementação de assinaturas recorrentes
+- [x] Implementação de assinaturas recorrentes
 - [ ] Tokenização de cartões
 - [ ] Sistema de renovação automática
 
@@ -48,11 +48,10 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [ ] Configuração de CI/CD
 - [ ] Dashboard de métricas para apoiadores
 - [ ] Sistema de notificações via webhook
-- [ ] Multiplataforma de pagamento (PicPay, Stripe)
 
 ## 🧭 Próximos Passos
-- [ ] Finalizar integração com Mercado Pago:
-  - [ ] Webhook de confirmação de PIX
+- [.] Finalizar integração:
+  - [x] Webhook de confirmação de PIX
   - [ ] Sistema de assinaturas com cartão
 - [ ] Implementar agendamentos para:
   - [ ] Verificação de expiração
@@ -70,7 +69,6 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [SQLAlchemy ORM](https://www.sqlalchemy.org/)
 - [PostgreSQL](https://www.postgresql.org/)
 - [FastAPI](https://fastapi.tiangolo.com/)
-- [Mercado Pago API](https://www.mercadopago.com.br/developers)
 - [httpx](https://www.python-httpx.org/)
 - [asyncio](https://docs.python.org/3/library/asyncio.html)
 - [Railway](https://railway.app/) *(planejado para banco de dados)*

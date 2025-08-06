@@ -12,3 +12,4 @@ requests-oauthlib
 authlib
 itsdangerous
 apscheduler
+psycopg2

@@ -1,7 +1,7 @@
-import discord
-import logging
-import os
-import httpx
+import re, discord, logging, os, httpx
+from bot.database import SessionLocal
+from bot.database.models import Apoiador
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta, timezone
 from discord.ext import commands
 from discord.ui import View, Button, Modal, TextInput
@@ -11,15 +11,15 @@ logger = logging.getLogger(__name__)
 # --- Modal de Doação (Formulário Pix) ---
 class DonationModal(Modal, title="Fazer Doação via Pix"):
     def __init__(self):
+        super().__init__(
+            custom_id="pix_donation_modal",
+            timeout=30.0
+        )
         self.ngrok_url = os.getenv('REDIRECT_URL')
+        
     amount = TextInput(
         label="Valor da Doação (R$)",
         placeholder="Ex: 10.00",
-        required=True
-    )
-    method = TextInput(
-        label="Método de Pagamento (Digite 'Pix')",
-        placeholder="Pix",
         required=True
     )
     email = TextInput(
@@ -34,53 +34,79 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
         min_length=11,
         max_length=11,
     )
+    cpf = TextInput(
+        label="CPF",
+        placeholder="12345678909",
+        required=True,
+        min_length=11,
+        max_length=11
+    )
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
             amount = float(self.amount.value)
-            method = self.method.value.lower()
             phone = self.phone.value
             email = self.email.value
+            cpf = self.cpf.value
 
             reference_id = f"doacao_discord_user_{interaction.user.id}"
             amount_cents = int(amount * 100)
+            guild_id = str(interaction.guild.id) if interaction.guild else "0"
+            
+            with SessionLocal() as session:
+                apoiador = Apoiador(
+                    discord_id=str(interaction.user.id),
+                    guild_id=guild_id,
+                    id_pagamento=reference_id,
+                    tipo_apoio="pix",
+                    email_doador=email,
+                    cpf_doador=cpf,
+                    telefone_doador=phone,
+                    valor_doacao=amount_cents,
+                    data_inicio=datetime.now(timezone.utc)
+                )
+                session.add(apoiador)
+                try:
+                    session.commit()
+                except IntegrityError:
+                    session.rollback()
+                    apoiador = session.query(Apoiador).filter_by(
+                        discord_id=str(interaction.user.id),
+                        guild_id=str(interaction.guild.id)
+                    ).first
+                    if apoiador:
+                        apoiador.id_pagamento = reference_id
+                        session.commit()
             brasilia_offset = timedelta(hours=-3)
             brasilia_tz = timezone(brasilia_offset)
             expiration = (datetime.now(brasilia_tz) + timedelta(days=180)).isoformat()
-
-
+            
             payment_data = {
                 "reference_id": reference_id,
+                "description": "Apoio Voluntário à Comunidade",
+                "qr_codes": [{
+                    "amount": {
+                        "value": amount_cents,
+                        "currency": "BRL"
+                    },
+                    "expiration_date": expiration
+                }],
+                "notification_urls": [f"{self.ngrok_url}/pagbank-webhook"],
                 "customer": {
                     "name": str(interaction.user),
                     "email": email,
-                    "tax_id": "12345678909",
-                    "phones": [
-                        {
-                            "country": "55",
-                            "area": phone[:2],
-                            "number": phone[2:],
-                            "type": "MOBILE"
-                        }
-                    ]
+                    "tax_id": cpf,
+                    "phones": [{
+                        "country": "55",
+                        "area": phone[:2],
+                        "number": phone[2:],
+                        "type": "MOBILE"
+                    }]
                 },
-                "items": [
-                    {
-                        "reference_id": "doacao_item_001",
-                        "name": "Doação Discord",
-                        "quantity": 1,
-                        "unit_amount": amount_cents
-                    }
-                ],
-                "qr_codes": [
-                    {
-                        "amount": {
-                            "value": amount_cents
-                        },
-                        "expiration_date": expiration
-                    }
-                ],
-                "notification_urls": [f"{self.ngrok_url}/pagbank-webhook"]
+                "metadata": {
+                    "transaction_type": "donation",
+                    "platform": "discord_community"
+                }
             }
 
             headers = {
@@ -130,90 +156,23 @@ class DoarView(View):
     async def doar_pix_button(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_modal(DonationModal())
 
-    @discord.ui.button(label="Cartão", style=discord.ButtonStyle.blurple, custom_id="doar_cartao", disabled=False)
-    async def doar_cartao_button(self, interaction: discord.Interaction, button: Button):
-        try:
-            checkout_data = {
-                "reference_id": f"card_checkout_{interaction.user.id}",
-                "customer": {
-                    "name": str(interaction.user),
-                    "email": f"{interaction.user.id}@temp.com",
-                    "tax_id": "12345678909"
-                },
-                "items": [{
-                    "reference_id": "doacao_001",
-                    "name": "Doação Discord",
-                    "quantity": 1,
-                    "unit_amount": 1000
-                }],
-                "payment_methods": [{
-                    "type": "CREDIT_CARD",
-                    "brands": ["VISA", "MASTERCARD"]
-                }],
-                "redirect_url": f"{self.ngrok_url}/obrigado",
-                "notification_urls": [f"{self.ngrok_url}/pagbank-webhook"],
-                "payment_notification_urls": [f"{self.ngrok_url}pagbank-webhook"]
-            }
+    @discord.ui.button(label="☕ Doar via Ko-fi", style=discord.ButtonStyle.secondary, custom_id="doar_kofi")
+    async def doar_kofi_button(self, interaction: discord.Interaction, button: Button):
+        # Embed de aviso antes de redirecionar
+        embed = discord.Embed(
+            title="☕ Doação via Ko-fi",
+            description=(
+                "Obrigado por considerar doar via Ko-fi!\n\n"
+                "**⚠️Antes de prosseguir⚠️:**\n"
+                "Quando for Doar, Coloque o seu nome de usuario do discord\n"   
+                "Caso contrario tera que ser feito verificação manual\n"
+                "- Visite o link abaixo para continuar.\n\n"
+                "[Clique aqui para doar no Ko-fi](https://ko-fi.com/W7W81J60WA)"
+            ),
+            color=discord.Color.orange()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
-            headers = {
-                "Authorization": f"Bearer {os.getenv('PAGBANK_API_KEY')}",
-                "Content-Type": "application/json",
-                "x-api-version": "4.0"
-            }
-
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{os.getenv('PAGBANK_ENDPOINT')}/checkouts",
-                    json=checkout_data,
-                    headers=headers
-                )
-
-                logger.info(f"Request: {checkout_data}")
-                logger.info(f"Response: {response.text}")
-
-                response.raise_for_status()
-                checkout_info = response.json()
-
-                payment_url = next(
-                    (link['href'] for link in checkout_info['links'] if link['rel'] == 'PAY'),
-                    None
-                )
-
-                if not payment_url:
-                    raise ValueError("URL de pagamento não encontrada na resposta")
-
-            embed = discord.Embed(
-                title="💳 Doação com Cartão",
-                description="Clique no botão abaixo para finalizar seu pagamento:",
-                color=0x3498db
-            )
-            embed.set_footer(text="Você será redirecionado para o PagBank.")
-
-            class PagamentoView(View):
-                def __init__(self, url: str):
-                    super().__init__(timeout=None)
-                    self.add_item(Button(
-                        label="Finalizar Pagamento",
-                        style=discord.ButtonStyle.link,
-                        url=url
-                    ))
-
-            view = PagamentoView(payment_url)
-
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-        except httpx.HTTPStatusError as e:
-            logger.error(f"Erro HTTP: {e.response.text}")
-            await interaction.response.send_message(
-                f"❌ Erro no PagBank: {e.response.json().get('error_message', 'Verifique os logs')}",
-                ephemeral=True
-            )
-        except Exception as e:
-            logger.error(f"Erro geral: {str(e)}", exc_info=True)
-            await interaction.response.send_message(
-                "❌ Erro interno ao processar pagamento",
-                ephemeral=True
-            )
 
 
 # --- Comando /doar ---
@@ -229,7 +188,7 @@ class DoarCommands(commands.Cog):
                 description=(
                     "Escolha a forma de doação:\n\n"
                     "💰 **Pix**: Doação única ou recorrente.\n"
-                    "💳 **Cartão**: Doação mensal recorrente via PagBank.\n\n"
+                    "☕ **kofi**: Doação mensal unica ou recorrente via Ko-fi.\n\n"
                     "Clique nos botões abaixo para mais informações."
                 ),
                 color=discord.Color.green()
