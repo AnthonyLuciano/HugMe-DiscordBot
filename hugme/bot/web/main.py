@@ -1,5 +1,7 @@
+import json
 from queue import Queue
 from datetime import datetime, timedelta, timezone
+import re
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi import FastAPI, Header, Request, Depends, HTTPException, APIRouter
@@ -83,93 +85,6 @@ def retry_worker():
 worker_thread = threading.Thread(target=retry_worker)
 worker_thread.daemon = True
 worker_thread.start()
-
-async def verify_webhook_signature(request: Request, body: bytes) -> bool:
-    if not app_config.WEBHOOK_SECRET:
-        raise HTTPException(status_code=500, detail="Webhook secret not configured")
-    
-    signature = request.headers.get("x-pagbank-signature")
-    if not signature:
-        return False
-        
-    digest = hmac.new(
-        app_config.WEBHOOK_SECRET.encode(), 
-        body, 
-        hashlib.sha256
-    ).hexdigest()
-    
-    
-
-    return hmac.compare_digest(digest, signature)
-async def pagbank_webhook(request: Request):
-    try:
-        body = await request.body()
-        if not await verify_webhook_signature(request, body):
-            raise HTTPException(status_code=403, detail="invalid signature")
-        
-        data = await request.json()
-        logger.info(f"Full webhook data: {data}")  # Log full payload
-        
-        event_type = data.get("event")
-        charge = data.get("charge", {})
-        charge_status = charge.get("status", "").upper() if charge else ""
-
-        # Debug logging with more details
-        logger.info(f"Received event: {event_type}, status: {charge_status}")
-        logger.info(f"Reference ID: {charge.get('reference_id')}")
-
-        # More flexible status check
-        if event_type != "PAYMENT_RECEIVED" or charge_status != "PAID":
-            logger.warning(f"Ignoring event - reason: "
-                           f"event_type_match={event_type == 'PAYMENT_RECEIVED'}, "
-                           f"status_match={charge_status == 'PAID'}")
-            return {"status": "ignored"}
-        
-        # ... rest of the function remains the same ...
-        
-        reference_id = charge.get("reference_id")
-        if not reference_id:
-            raise HTTPException(status_code=400, detail="Missing reference_id")
-        
-        with SessionLocal() as session:
-            apoiador = session.query(Apoiador).filter_by(id_pagamento=reference_id).first()
-            if not apoiador:
-                logger.warning(f"Pagamento não vinculado: {reference_id}")
-                return {"status": "apoiador_not_found"}
-            
-             # Atualizar informações do pagamento
-            apoiador.valor_doacao = charge.get("amount", {}).get("value")
-            apoiador.metodo_pagamento = "pix"
-            apoiador.data_pagamento = datetime.now(timezone.utc)
-            apoiador.ultimo_pagamento = datetime.now(timezone.utc)
-            apoiador.data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
-            apoiador.ativo = True
-            
-            # Get guild config
-            guild_config = session.query(GuildConfig).filter_by(guild_id=apoiador.guild_id).first()
-            if guild_config and guild_config.cargo_apoiador_id:
-                try:
-                    verificador = VerificacaoMembro(bot)
-                    success = await verificador.atribuir_cargo_apos_pagamento(
-                        apoiador.discord_id,
-                        int(apoiador.guild_id),
-                        int(guild_config.cargo_apoiador_id)
-                    )
-                    if success:
-                        apoiador.cargo_atribuido = True
-                        logger.info(f"Cargo atribuído: {apoiador.discord_id}")
-                except Exception as e:
-                    logger.error(f"Erro ao atribuir cargo: {str(e)}")
-                    # Increment failure counter
-                    if guild_config:
-                        guild_config.webhook_failures += 1
-            
-            session.commit()
-            return {"status": "success"}
-    
-    except Exception as e:
-        logger.error(f"Webhook error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
     
 security = HTTPBearer()
 
@@ -413,76 +328,67 @@ async def set_supporter_role(request: Request, db: Session = Depends(get_db)):
         session.commit()
     
     return {"status": "success", "guild_id": guild_id, "role_id": role_id}
-    
-
-@app.post("/pagbank-webhook")
-async def handle_pagbank_webhook(request: Request):
-    return await pagbank_webhook(request)
-
-# Adicionar esta rota para compatibilidade com notificações antigas
-
-@app.post("/webhook")
-async def legacy_webhook(request: Request):
-    logger.warning("Legacy webhook endpoint called, redirecting to pagbank-webhook")
-    return await pagbank_webhook(request)
-
-from fastapi import Request, HTTPException
-from datetime import datetime, timedelta, timezone
-import logging
 
 logger = logging.getLogger(__name__)
-
-@app.post("/kofi-webhook")
-async def handle_kofi_webhook(request: Request):
-    try:
-        body = await request.body()
-        if not await verify_webhook_signature(request, body):
-            raise HTTPException(status_code=403, detail="Invalid signature")
-        
-        data = await request.json()
-        logger.info(f"Received Ko-fi webhook: {data}")
-        
-        # Lógica para processar a notificação do Ko-fi
-        reference_id = data.get("kofi_transaction_id")
-        if not reference_id:
-            raise HTTPException(status_code=400, detail="Missing kofi_transaction_id")
-        
-        with SessionLocal() as session:
-            apoiador = session.query(Apoiador).filter_by(id_pagamento=reference_id).first()
-            if not apoiador:
-                logger.warning(f"Payment not linked: {reference_id}")
-                return {"status": "apoiador_not_found"}
-            
-            apoiador.ultimo_pagamento = datetime.now(timezone.utc)
-            apoiador.data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
-            apoiador.ativo = True
-            
-            guild_config = session.query(GuildConfig).filter_by(guild_id=apoiador.guild_id).first()
-            if guild_config and guild_config.cargo_apoiador_id:
-                try:
-                    verificador = VerificacaoMembro(bot)
-                    success = await verificador.atribuir_cargo_apos_pagamento(
-                        apoiador.discord_id,
-                        int(apoiador.guild_id),
-                        int(guild_config.cargo_apoiador_id)
-                    )
-                    if success:
-                        apoiador.cargo_atribuido = True
-                        logger.info(f"Cargo assigned: {apoiador.discord_id}")
-                except Exception as e:
-                    logger.error(f"Error assigning role: {str(e)}")
-                    if guild_config:
-                        guild_config.webhook_failures += 1
-            
-            session.commit()
-            return {"status": "success"}
-
-    except Exception as e:
-        logger.error(f"Ko-fi webhook error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 async def verify_kofi_webhook_signature(request: Request, body: bytes) -> bool:
     if not app_config.WEBHOOK_SECRET:
         raise HTTPException(status_code=500, detail="Webhook secret not configured")
     
     signature = request.headers.get("x-ko-signature")
+    if not signature:
+        return False
+    
+    expected_signature = hmac.new(
+        app_config.WEBHOOK_SECRET.encode(),
+        body,
+        hashlib.sha256,
+        ).hexdigest()
+    
+    return hmac.compare_digest(expected_signature, signature)
+
+
+@app.post("/kofi-webhook")
+async def handle_kofi_webhook(request: Request):
+    try:
+        form_data = await request.form()
+        if "data" not in form_data:
+            raise HTTPException(status_code=400, detail="Missing data field")
+
+        data = json.loads(form_data["data"])
+        
+        #verificação do token
+        if "verification_token" in data and app_config.KOFI_VERIFICATION_TOKEN:
+            if data["verification_token"] != app_config.KOFI_VERIFICATION_TOKEN:
+                raise HTTPException(status_code=403, detail="Invalid verification token")
+        
+        if data["type"] not in ["Donation", "Subscription"]:
+            return {"status": "ignored"}
+        
+        #pega o nome do discorde no nickname dado no ko-fi ou mensagem
+        discord_name= None
+        for source in [data.get("from_name"), data.get("message")]:
+            if source and (match := re.search(r"(?:discord\.com/users/)?(\d{17,19}|[a-zA-Z0-9_]{2,32})", str(source))):
+                discord_name = match.group(1)
+                break
+        #envia webhook de notificação
+        donohook_url = app_config.DISCORD_DONOHOOK
+        if donohook_url:
+            embed = {
+                "title": "📊 Nova Doação Ko-fi",
+                "description": f"De: {data.get('from_name', 'Anônimo')}",
+                "color": 0x29ABE2,
+                "fields": [
+                    {"name": "Valor", "value": f"{data['amount']} {data['currency']}"},
+                    {"name": "Discord ID", "value": discord_name or "Não informado"},
+                    {"name": "Email", "value": data.get('email', 'Não informado')},
+                    {"name": "Mensagem", "value": data.get('message', 'Nenhuma')[:1000]}
+                ]
+            }
+            async with httpx.AsyncClient() as client:
+                await client.post(donohook_url, json={"embeds": [embed]})
+        
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Ko-fi webhook error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

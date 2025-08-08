@@ -11,9 +11,7 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - Suporte a pagamentos únicos e assinaturas recorrentes
 
 ## 🚧 Status do Projeto
-**Este projeto está em Desenvolvimento:**
-*migração de sistemas*
-
+**Este projeto está em Desenvolvimento**
 
 ### Funcionalidades concluídas:
 - [x] Configuração inicial do ambiente Python com virtualenv
@@ -21,47 +19,43 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [x] Configuração do SQLAlchemy ORM
 - [x] Sistema básico do discord.py (comandos/eventos)
 - [x] Modelo de banco de dados para apoiadores
-- [x] Comando `/doar` com interface interativa via botão e modal
+- [x] Comando `/doar` com interface interativa via botão
 - [x] Painel administrativo web básico
 - [x] Autenticação via Discord OAuth2
 
-### Integração [█████████░] **90%**
-#### PIX via:
-- [x] Configuração da API 
-- [x] Geração de QR Code dinâmico
-- [x] Sistema básico de webhooks
-- [x] Validação completa de pagamento via webhook
+### Integrações de Pagamento:
+#### PIX [██░░░░░░░░] **20%**
+- [x] Interface básica de doação
+- [ ] Geração de QR Code dinâmico
+- [ ] Sistema de webhooks
+- [ ] Validação de pagamentos
+
+#### Ko-fi [██████░░░░] **60%**
+- [x] Botão de doação via Ko-fi
+- [x] Redirecionamento para página de doação
+- [ ] Verificação automática de doações
 - [ ] Atribuição automática de cargo
-### Integração [███░░░░░░░] **30%**
-#### Cartão de Crédito:
-- [x] Implementação de assinaturas recorrentes
-- [ ] Tokenização de cartões
-- [ ] Sistema de renovação automática
 
 ### Funcionalidades em andamento:
+- [ ] Implementação do novo sistema PIX
 - [ ] Tarefas agendadas para expiração de apoios
 - [ ] Refinamento do painel administrativo
-- [ ] Integração completa entre webhook e cargos
 
 ### Funcionalidades futuras:
 - [ ] Sistema avançado de logs/alertas
-- [ ] Configuração de CI/CD
 - [ ] Dashboard de métricas para apoiadores
-- [ ] Sistema de notificações via webhook
+- [ ] Documentação para integrações externas
 
 ## 🧭 Próximos Passos
-- [.] Finalizar integração:
-  - [x] Webhook de confirmação de PIX
-  - [ ] Sistema de assinaturas com cartão
-- [ ] Implementar agendamentos para:
-  - [ ] Verificação de expiração
-  - [ ] Atualização de cargos automaticamente
-- [ ] Adicionar painel com histórico e logs
-- [ ] Documentar API para integrações externas
+- [ ] Implementar novo sistema PIX:
+  - [ ] Geração de QR Codes
+  - [ ] Webhook de confirmação
+- [ ] Finalizar integração com Ko-fi
+- [ ] Sistema de notificações via webhook
 
 ## 🏁 Etapa Final
 - [ ] Testes completos no ambiente real
-- [ ] Migrar o bot para ambiente de produção
+- [ ] Migração para produção
 
 ## 🛠 Tecnologias Utilizadas
 - [Python 3.12+](https://www.python.org/)
