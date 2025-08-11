@@ -10,8 +10,10 @@ class Config:
     DATABASE_URL = getenv('DATABASE_URL')
     APPLICATION_ID = getenv('APPLICATION_ID')
     PAGBANK_EMAIL = getenv('PAGBANK_EMAIL')
-    KOFI_API_KEY = getenv('KOFI_API_KEY')
+    KOFI_TOKEN = getenv('KOFI_TOKEN')
     KOFI_ENDPOINT = getenv('KOFI_ENDPOINT')
+    PAGBANK_ENDPOINT = getenv('PAGBANK_ENDPOINT')
+    DISCORD_DONOHOOK = getenv('DISCORD_DONOHOOK_URL')
 
     # Webhook and security settings
     WEBHOOK_SECRET = getenv('WEBHOOK_SECRET')

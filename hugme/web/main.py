@@ -1,22 +1,31 @@
-from queue import Queue
+import asyncio, hashlib, hmac, json, logging, os, re, threading
 from datetime import datetime, timedelta, timezone
+from queue import Queue
+
+import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi import FastAPI, Header, Request, Depends, HTTPException, APIRouter
+from authlib.integrations.starlette_client import OAuth
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from bot.config import config as app_config
-from bot.database import SessionLocal
-from bot.database import get_db
-from bot.database.models import Apoiador, GuildConfig
-from bot.servicos.VerificacaoMembro import VerificacaoMembro
-from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
-import httpx, os, logging, asyncio, hmac, hashlib, threading
+
+from bot.config import config as app_config
+from bot.database import SessionLocal, get_db
+from bot.database.models import Apoiador, GuildConfig
+from bot.servicos.VerificacaoMembro import VerificacaoMembro
+"""
+ola, quem estiver vendo esse codigo, se voce notar que tem comandos em ingles e logs em portugues
+é porque o ADM coringou, necessito de ajuda seria :,D
+codigo ta mais bagunçado que um quarto de criança, por favor nao notem a bagunça
+"""
 
 from bot.shared import get_bot_instance
 
@@ -84,50 +93,124 @@ worker_thread = threading.Thread(target=retry_worker)
 worker_thread.daemon = True
 worker_thread.start()
 
-async def verify_webhook_signature(request: Request, body: bytes) -> bool:
-    if not app_config.WEBHOOK_SECRET:
-        raise HTTPException(status_code=500, detail="Webhook secret not configured")
-    
-    signature = request.headers.get("x-pagbank-signature")
-    if not signature:
-        return False
-        
-    digest = hmac.new(
-        app_config.WEBHOOK_SECRET.encode(), 
-        body, 
-        hashlib.sha256
-    ).hexdigest()
-    
-    
+async def _extract_order_id(payload: dict, headers) -> str | None:
+    # Checar header primeiro (vem em muitos webhooks do PagBank)
+    order_id = headers.get("x-product-id") or headers.get("X-Product-Id")
+    if order_id:
+        return order_id
 
-    return hmac.compare_digest(digest, signature)
+    # Checar campos comuns no body
+    for key in ("id", "order_id", "reference_id"):
+        if payload.get(key):
+            return payload.get(key)
+
+    # Checar charges -> reference_id
+    charges = payload.get("charges") or []
+    if isinstance(charges, list) and charges:
+        first = charges[0]
+        if isinstance(first, dict):
+            return first.get("reference_id") or first.get("id")
+
+    # resource.order_id (caso exista)
+    resource = payload.get("resource") or {}
+    if isinstance(resource, dict):
+        return resource.get("order_id") or resource.get("id")
+
+    return None
+
+async def verify_webhook_signature(request: Request, body: bytes) -> bool:
+    if not app_config.PAGBANK_API_KEY:
+        raise HTTPException(status_code=500, detail="PagBank token not configured")
+
+    headers = request.headers
+
+    # 1) Se header de autenticidade existir, validar por SHA256(token + "-" + payload_cru)
+    authenticity = headers.get("x-authenticity-token") or headers.get("X-Authenticity-Token")
+    if authenticity:
+        try:
+            raw_payload = body.decode("utf-8")
+        except UnicodeDecodeError:
+            logger.warning("Cannot decode payload as utf-8 for signature check")
+            return False
+
+        expected = hashlib.sha256(f"{app_config.PAGBANK_API_KEY}-{raw_payload}".encode("utf-8")).hexdigest()
+        return hmac.compare_digest(expected, authenticity)
+
+    # 2) Fallback: validação ativa (consulta na API do PagBank)
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except json.JSONDecodeError:
+        logger.warning("Webhook payload is not valid JSON")
+        return False
+
+    order_id = await _extract_order_id(payload, headers)
+    if not order_id:
+        logger.warning("No order_id found in webhook payload or headers")
+        return False
+
+    # Confirmar com a API do PagBank
+    endpoint = app_config.PAGBANK_ENDPOINT.rstrip("/")  # ex: https://sandbox.api.pagseguro.com
+    url = f"{endpoint}/orders/{order_id}"
+
+    headers_out = {
+        "Authorization": f"Bearer {app_config.PAGBANK_API_KEY}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+    try:
+        timeout = httpx.Timeout(5.0, connect=3.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.get(url, headers=headers_out)
+        if resp.status_code != 200:
+            logger.error(f"PagBank order lookup failed ({resp.status_code}): {resp.text}")
+            return False
+
+        order_data = resp.json()
+        # Verifique status de ordem ou charges
+        if order_data.get("status") == "PAID":
+            return True
+
+        for ch in order_data.get("charges", []) or []:
+            if ch.get("status") == "PAID":
+                return True
+
+        logger.info(f"Order {order_id} not PAID (order_status={order_data.get('status')})")
+        return False
+
+    except httpx.RequestError as e:
+        logger.error(f"HTTP error when confirming order {order_id}: {e}")
+        return False
+    except Exception as e:
+        logger.exception(f"Unexpected error verifying webhook for order {order_id}: {e}")
+        return False
+
+@app.post("/pagbank-webhook")
 async def pagbank_webhook(request: Request):
     try:
         body = await request.body()
         if not await verify_webhook_signature(request, body):
             raise HTTPException(status_code=403, detail="invalid signature")
         
-        data = await request.json()
+        data = json.loads(body)
+        
         logger.info(f"Full webhook data: {data}")  # Log full payload
         
-        event_type = data.get("event")
-        charge = data.get("charge", {})
-        charge_status = charge.get("status", "").upper() if charge else ""
+        charges = data.get("charges", [])
+        
+        # Get first charge's status if available
+        charge_status = charges[0].get("status", "").upper() if charges else ""
 
         # Debug logging with more details
-        logger.info(f"Received event: {event_type}, status: {charge_status}")
-        logger.info(f"Reference ID: {charge.get('reference_id')}")
+        logger.info(f"status: {charge_status}")
+        logger.info(f"Reference ID: {charges[0].get('reference_id') if charges else 'N/A'}")
 
         # More flexible status check
-        if event_type != "PAYMENT_RECEIVED" or charge_status != "PAID":
-            logger.warning(f"Ignoring event - reason: "
-                           f"event_type_match={event_type == 'PAYMENT_RECEIVED'}, "
-                           f"status_match={charge_status == 'PAID'}")
+        if charge_status != "PAID":
+            logger.warning(f"Ignorando webhook - status não é PAID: {charge_status}")
             return {"status": "ignored"}
         
-        # ... rest of the function remains the same ...
-        
-        reference_id = charge.get("reference_id")
+        reference_id = charges[0].get("reference_id") if charges else None
         if not reference_id:
             raise HTTPException(status_code=400, detail="Missing reference_id")
         
@@ -138,7 +221,7 @@ async def pagbank_webhook(request: Request):
                 return {"status": "apoiador_not_found"}
             
              # Atualizar informações do pagamento
-            apoiador.valor_doacao = charge.get("amount", {}).get("value")
+            apoiador.valor_doacao = charges[0].get("amount", {}).get("value") if charges else None
             apoiador.metodo_pagamento = "pix"
             apoiador.data_pagamento = datetime.now(timezone.utc)
             apoiador.ultimo_pagamento = datetime.now(timezone.utc)
@@ -165,6 +248,24 @@ async def pagbank_webhook(request: Request):
                         guild_config.webhook_failures += 1
             
             session.commit()
+            donohook_url= app_config.DISCORD_DONOHOOK
+            if donohook_url and charges:
+                charge = charges[0]
+                customer = charge.get("customer", {})
+                
+                embed = {
+                    "title": "💰 Nova Doação via PIX",
+                    "color": 0x32CD32,
+                    "fields": [
+                        {"name": "Valor", "value": f"R$ {float(charge.get('amount', {}).get('value', 0)) / 100:.2f}"},
+                        {"name": "Discord ID", "value": apoiador.discord_id if apoiador else "Não vinculado"},
+                        {"name": "Email", "value": customer.get('email', 'Não informado')},
+                        {"name": "Status", "value": charge_status},
+                        {"name": "ID Transação", "value": charge.get('id', 'N/A')}
+                    ]
+                }
+                async with httpx.AsyncClient() as client:
+                    await client.post(donohook_url, json={"embeds": [embed]})
             return {"status": "success"}
     
     except Exception as e:
@@ -219,7 +320,7 @@ async def fetch_with_retry(client,url,headers,max_retries=5, delay=5):
                 await asyncio.sleep(delay)
             else:
                 raise e
-    raise httpx.ConnectTimeout("Todas as tentativas falharam.")
+    raise httpx.ConnectTimeout("Todas as tentativas falharam, é foda hora do debugging.")
 
 @app.get("/auth")
 async def auth(request: Request):
@@ -256,7 +357,7 @@ async def auth(request: Request):
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     user = request.session.get('user')
     if not user:
-        raise HTTPException(status_code=401, detail="Não autenticado")
+        raise HTTPException(status_code=401, detail="Não autenticado, ai você me quebra usuario ('-')")
 
     # Verificar permissões de admin
     async with httpx.AsyncClient() as client:
@@ -413,11 +514,6 @@ async def set_supporter_role(request: Request, db: Session = Depends(get_db)):
         session.commit()
     
     return {"status": "success", "guild_id": guild_id, "role_id": role_id}
-    
-
-@app.post("/pagbank-webhook")
-async def handle_pagbank_webhook(request: Request):
-    return await pagbank_webhook(request)
 
 # Adicionar esta rota para compatibilidade com notificações antigas
 
@@ -431,58 +527,91 @@ from datetime import datetime, timedelta, timezone
 import logging
 
 logger = logging.getLogger(__name__)
-
 @app.post("/kofi-webhook")
 async def handle_kofi_webhook(request: Request):
     try:
-        body = await request.body()
-        if not await verify_webhook_signature(request, body):
-            raise HTTPException(status_code=403, detail="Invalid signature")
+        form_data = await request.form()
+        if "data" not in form_data:
+            raise HTTPException(status_code=400, detail="Missing data field")
         
-        data = await request.json()
-        logger.info(f"Received Ko-fi webhook: {data}")
-        
-        # Lógica para processar a notificação do Ko-fi
-        reference_id = data.get("kofi_transaction_id")
-        if not reference_id:
-            raise HTTPException(status_code=400, detail="Missing kofi_transaction_id")
-        
-        with SessionLocal() as session:
-            apoiador = session.query(Apoiador).filter_by(id_pagamento=reference_id).first()
-            if not apoiador:
-                logger.warning(f"Payment not linked: {reference_id}")
-                return {"status": "apoiador_not_found"}
-            
-            apoiador.ultimo_pagamento = datetime.now(timezone.utc)
-            apoiador.data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
-            apoiador.ativo = True
-            
-            guild_config = session.query(GuildConfig).filter_by(guild_id=apoiador.guild_id).first()
-            if guild_config and guild_config.cargo_apoiador_id:
-                try:
-                    verificador = VerificacaoMembro(bot)
-                    success = await verificador.atribuir_cargo_apos_pagamento(
-                        apoiador.discord_id,
-                        int(apoiador.guild_id),
-                        int(guild_config.cargo_apoiador_id)
-                    )
-                    if success:
-                        apoiador.cargo_atribuido = True
-                        logger.info(f"Cargo assigned: {apoiador.discord_id}")
-                except Exception as e:
-                    logger.error(f"Error assigning role: {str(e)}")
-                    if guild_config:
-                        guild_config.webhook_failures += 1
-            
-            session.commit()
-            return {"status": "success"}
+        data = json.loads(form_data["data"])
+        transaction_id = data.get("transaction_id", f"kofi_{int(datetime.now(timezone.utc).timestamp())}")
 
+
+        # Token verification
+        if "verification_token" in data and app_config.KOFI_TOKEN:
+            if data["verification_token"] != app_config.KOFI_TOKEN:
+                raise HTTPException(status_code=403, detail="Invalid verification token")
+
+        if data["type"] not in ["Donation", "Subscription"]:
+            return {"status": "ignored"}
+
+        # Extract Discord ID
+        for source in [data.get("from_name"), data.get("message")]:
+            if source and (match := re.search(r"(?:discord\.com/users/)?(\d{17,19})", str(source))):
+                discord_id = match.group(1)
+                break
+        else:
+            discord_id = "kofi_anon_" + str(int(datetime.now(timezone.utc).timestamp()))  # Valor alternativo
+
+        # Database operations
+        with SessionLocal() as session:
+            exists_dupped = session.query(Apoiador).filter_by(
+                id_pagamento=transaction_id
+            ).first()
+            if exists_dupped:
+                logger.warning(f"Duplicate Ko-fi transaction detected: {transaction_id}")
+                return {"status": "duplicate"}
+            apoiador = Apoiador(
+                discord_id=discord_id,
+                guild_id="0",  # Global donation
+                id_pagamento=data.get("transaction_id", f"kofi_{int(datetime.now(timezone.utc).timestamp())}"),
+                tipo_apoio="kofi",
+                email_doador=data.get("email"),
+                valor_doacao=int(float(data["amount"]) * 100),  # Convert to cents
+                data_inicio=datetime.now(timezone.utc),
+                data_expiracao=datetime.now(timezone.utc) + timedelta(days=30) if data["type"] == "Subscription" else None,
+                ativo=True
+            )
+            session.add(apoiador)
+            session.commit()
+
+        # Discord notification
+        donohook_url = app_config.DISCORD_DONOHOOK
+        if donohook_url:
+            embed = {
+                "title": "📊 Nova Doação Ko-fi",
+                "description": f"De: {data.get('from_name', 'Anônimo')}",
+                "color": 0x29ABE2,
+                "fields": [
+                    {"name": "Valor", "value": f"{data['amount']} {data['currency']}"},
+                    {"name": "Discord ID", "value": discord_id or "Não informado"},
+                    {"name": "Email", "value": data.get('email', 'Não informado')},
+                    {"name": "Mensagem", "value": data.get('message', 'Nenhuma')[:1000]},
+                    {"name": "Tipo", "value": "Assinatura" if data["type"] == "Subscription" else "Doação Única"}
+                ]
+            }
+            async with httpx.AsyncClient() as client:
+                await client.post(donohook_url, json={"embeds": [embed]})
+
+        return {"status": "success"}
     except Exception as e:
         logger.error(f"Ko-fi webhook error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 async def verify_kofi_webhook_signature(request: Request, body: bytes) -> bool:
     if not app_config.WEBHOOK_SECRET:
         raise HTTPException(status_code=500, detail="Webhook secret not configured")
     
     signature = request.headers.get("x-ko-signature")
+    
+    if not signature:
+        return False
+    
+    expected_signature = hmac.new(
+        app_config.WEBHOOK_SECRET.encode(),
+        body,
+        hashlib.sha256,
+        ).hexdigest()
+    return hmac.compare_digest(expected_signature, signature)

@@ -13,7 +13,7 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
     def __init__(self):
         super().__init__(
             custom_id="pix_donation_modal",
-            timeout=30.0
+            timeout=180.0
         )
         self.ngrok_url = os.getenv('REDIRECT_URL')
         
@@ -72,8 +72,8 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                     session.rollback()
                     apoiador = session.query(Apoiador).filter_by(
                         discord_id=str(interaction.user.id),
-                        guild_id=str(interaction.guild.id)
-                    ).first
+                        guild_id=guild_id
+                    ).first()
                     if apoiador:
                         apoiador.id_pagamento = reference_id
                         session.commit()
@@ -114,14 +114,22 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                 "Content-Type": "application/json"
             }
 
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{os.getenv('PAGBANK_ENDPOINT')}/orders",
-                    json=payment_data,
-                    headers=headers
-                )
-                response.raise_for_status()
-                payment_info = response.json()
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                try:
+                    response = await client.post(
+                        f"{os.getenv('PAGBANK_ENDPOINT')}/orders",
+                        json=payment_data,
+                        headers=headers
+                    )
+                    response.raise_for_status()
+                    payment_info = response.json()
+                except httpx.RequestError as e:
+                    logger.error(f"Falha na conexão com PagBank: {str(e)}")
+                    await interaction.followup.send(
+                        "⚠️ Serviço de pagamento temporariamente indisponível. Tente novamente mais tarde.",
+                    ephemeral=True
+                    )
+                    return
 
             # Pega o QR Code
             qr_code_url = payment_info["qr_codes"][0]["links"][0]["href"]
@@ -145,7 +153,36 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                 ephemeral=True
             )
 
+class DMConfirmationView(discord.ui.View):
+    def __init__(self, bot):
+        super().__init__(timeout=180.0)
+        self.bot = bot
 
+    @discord.ui.button(label="Sim, Continuar", style=discord.ButtonStyle.green)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Mostra o mesmo embed de opções que seria exibido em servidores
+        embed = discord.Embed(
+            title="💖 Apoie Nossa Comunidade!",
+            description=(
+                "Escolha a forma de doação:\n\n"
+                "💰 **Pix**: Doação única ou recorrente.\n"
+                "☕ **Ko-fi**: Doação mensal via cartão.\n\n"
+                "Clique nos botões abaixo para mais informações."
+            ),
+            color=discord.Color.green()
+        )
+        view = DoarView(self.bot)  # View normal com botões PIX/Ko-fi
+        await interaction.response.edit_message(embed=embed, view=view, ephemeral = True)
+
+    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.red)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            content="❌ Doação cancelada.",
+            view=None,
+            embed=None,
+            ephemeral = True
+        )
+    
 class DoarView(View):
     def __init__(self, bot):
         super().__init__(timeout=180)
@@ -183,21 +220,47 @@ class DoarCommands(commands.Cog):
     @commands.hybrid_command(name="doar", description="Inicie o processo de doação para a comunidade")
     async def doar(self, ctx: commands.Context):
         try:
+            if not ctx.author:
+                raise ValueError("Contexto inválido - author ausente")
+            
+            if not ctx.guild:
+                embed = discord.Embed(
+                    title="⚠️ Doação via Mensagem Direta",
+                    description=(
+                        "Doações em DMs **não concedem recompensas** em servidores.\n"
+                        "Caso deseje tais recompenças use o comando no servidor \n"
+                        "Ou notifique um Admin ou o Desenvolvedor no servidor de sua doação\n -MrMedicMain(dev)\n\n"
+                        "**Deseja continuar mesmo assim?**"
+                    ),
+                    color=discord.Color.orange()
+                )
+                view = DMConfirmationView(self.bot)
+                await ctx.send(embed=embed, view=view, ephemeral = True)
+                return
+
+
             embed = discord.Embed(
                 title="💖 Apoie Nossa Comunidade!",
                 description=(
                     "Escolha a forma de doação:\n\n"
                     "💰 **Pix**: Doação única ou recorrente.\n"
-                    "☕ **kofi**: Doação mensal unica ou recorrente via Ko-fi.\n\n"
+                    "☕ **Ko-fi**: Doação mensal via cartão.\n\n"
                     "Clique nos botões abaixo para mais informações."
                 ),
                 color=discord.Color.green()
             )
+        
             view = DoarView(self.bot)
-            await ctx.send(embed=embed, view=view)
-        except discord.Forbidden:
-            await ctx.send("❌ Não foi possível exibir os botões. Verifique suas permissões!", ephemeral=True)
+            await ctx.send(embed=embed, view=view, ephemeral = True)
 
+        except discord.Forbidden:
+            await ctx.send("❌ Sem permissões para enviar mensagens aqui!", ephemeral=True)
+        except AttributeError as e:
+            logger.error(f"Erro de atributo no comando doar: {str(e)}")
+            await ctx.send("❌ Ocorreu um erro interno. Tente novamente mais tarde.", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Erro inesperado em doar: {str(e)}", exc_info=True)
+            await ctx.send("❌ Falha ao processar o comando. Notifique os administradores.", ephemeral=True)
 # --- Setup ---
 async def setup(bot):
     await bot.add_cog(DoarCommands(bot))

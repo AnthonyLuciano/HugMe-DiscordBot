@@ -24,6 +24,9 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [x] Comando `/doar` com interface interativa via botão e modal
 - [x] Painel administrativo web básico
 - [x] Autenticação via Discord OAuth2
+- [x] Finalizar integração:
+  - [x] Webhook de confirmação de PIX
+  - [x] Sistema de assinaturas com cartão
 
 ### Integração [█████████░] **90%**
 #### PIX via:
@@ -32,12 +35,12 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [x] Sistema básico de webhooks
 - [x] Validação completa de pagamento via webhook
 - [ ] Atribuição automática de cargo
-### Integração [███░░░░░░░] **30%**
+### Integração [█████████░] **90%**
 #### Cartão de Crédito:
-- [x] Implementação de assinaturas recorrentes
-- [ ] Tokenização de cartões
-- [ ] Sistema de renovação automática
-
+- [x] Implementação de assinaturas recorrentes (ko-fi)
+- [x] Tokenização de cartões (ko-fi)
+- [x] Sistema de renovação automática (ko-fi)
+- [ ] Atribuição automática de cargo
 ### Funcionalidades em andamento:
 - [ ] Tarefas agendadas para expiração de apoios
 - [ ] Refinamento do painel administrativo
@@ -50,9 +53,6 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [ ] Sistema de notificações via webhook
 
 ## 🧭 Próximos Passos
-- [.] Finalizar integração:
-  - [x] Webhook de confirmação de PIX
-  - [ ] Sistema de assinaturas com cartão
 - [ ] Implementar agendamentos para:
   - [ ] Verificação de expiração
   - [ ] Atualização de cargos automaticamente
