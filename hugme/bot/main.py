@@ -17,6 +17,58 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 class DatabaseManager:
+    #json de testes pelamor de deus nao use no prod 🙏🙏🙏
+    async def criar_qrcode_pix(self, valor: float, descricao: str):
+        headers = {
+            "Authorization": f"Bearer {os.getenv('PAGBANK_API_KEY')}",
+            "Content-Type": "application/json",
+            "x-api-version": "4.0"
+        }
+        payload = {
+            "reference_id": f"doacao_{int(time.time())}",
+            "customer":{
+                "name": "Teste Sandbox",
+                "email":"teste@sandbox.pagseguro.com.br",
+                "tax_id": "12345678909",
+            },
+            "items": [{
+                "reference_id": "item-1",
+                "name": descricao[:100],
+                "quantity": 1,
+                "unit_amount": int(valor * 100)
+            }],
+            "qr_codes": [{
+            "amount": {"value": int(valor * 100)},
+            "expiration_date": "2025-08-31T23:59:59-03:00"
+            }],
+            "notification_urls": [
+                "https://example.com/notifications"
+            ]
+        }
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                resp = await client.post(
+                    f"{os.getenv('PAGBANK_ENDPOINT')}/orders",
+                    json=payload,
+                    headers=headers
+                )
+                resp.raise_for_status()
+            
+                data = resp.json()
+                # Busca o link de imagem PNG
+                links = data["qr_codes"][0].get("links", [])
+                for link in links:
+                    if link.get("media") == "image/png":
+                        return link["href"]
+                # Fallback para primeiro link
+                if links:
+                    return links[0]["href"]
+                raise RuntimeError("Nenhum link de QR Code encontrado na resposta")
+            
+            except httpx.HTTPStatusError as e:
+                logger.error(f"Erro PagBank [{e.response.status_code}]: {e.response.text}")
+                raise
     def obter_apoiador(self, discord_id: str, guild_id: str) -> Apoiador | None:
         """Obtém um apoiador pelo Discord ID e Guild ID"""
         with Session(engine) as session:
