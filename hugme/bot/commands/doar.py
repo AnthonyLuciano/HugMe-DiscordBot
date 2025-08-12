@@ -1,3 +1,4 @@
+import json
 import re, discord, logging, os, httpx
 from bot.database import SessionLocal
 from bot.database.models import Apoiador
@@ -108,7 +109,10 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                     "platform": "discord_community"
                 }
             }
-
+            logger.info(
+                "JSON enviado ao PagBank:\n%s", 
+                json.dumps(payment_data, indent=2, ensure_ascii=False)
+            )
             headers = {
                 "Authorization": f"Bearer {os.getenv('PAGBANK_API_KEY')}",
                 "Content-Type": "application/json"

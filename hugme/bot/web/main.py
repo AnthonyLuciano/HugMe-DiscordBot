@@ -301,6 +301,10 @@ scheduler.start()
 async def home(request: Request):
     return templates.TemplateResponse("home.html", {"request": request})
 
+@app.get("/")
+async def post_root():
+    return {"error": "Use specific endpoints like /pagbank-webhook or /kofi-webhook"}
+
 @app.get("/login")
 async def login(request: Request):
     redirect_uri = request.url_for('auth')

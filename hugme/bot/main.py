@@ -1,4 +1,4 @@
-import discord, os, logging, httpx, time
+import discord, os, logging, httpx, time, threading, uvicorn
 from sqlalchemy.orm import Session
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -126,7 +126,7 @@ class HugMeBot(commands.Bot):
             return
         logger.error(f"Erro no comando {ctx.command}: {error}")
         await ctx.send(f"⚠️ Ocorreu um erro: {str(error)}")
-
+    
 # Cria e executa o bot
 if __name__ == '__main__':
     bot = HugMeBot()
