@@ -13,3 +13,4 @@ authlib
 itsdangerous
 apscheduler
 psycopg2
+pymysql
