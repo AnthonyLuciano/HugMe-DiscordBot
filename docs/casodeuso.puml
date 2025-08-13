@@ -4,25 +4,36 @@ skinparam monochrome true
 
 actor Usuário
 actor Administrador
-actor SistemaPagBank
+actor "Sistema PagBank" as PagBank
+actor "Sistema Ko-fi" as KoFi
 
 rectangle Bot {
-  usecase "Iniciar processo de doação" as UC1
-  usecase "Escolher forma de pagamento" as UC2
+  usecase "Iniciar doação" as UC1
+  usecase "Escolher: PIX ou Ko-fi" as UC2
   usecase "Gerar QR Code PIX" as UC3
-  usecase "Visualizar link PagBank" as UC4
-  usecase "Aprovar doação" as UC6
-  usecase "Visualizar painel admin" as UC7
+  usecase "Processar pagamento Ko-fi" as UC4
+  usecase "Verificar doação" as UC5
+  usecase "Gerenciar doações" as UC6
 }
 
 Usuário --> UC1
 Usuário --> UC2
-UC2 --> UC3 : PIX selecionado
-UC2 --> UC4 : Cartão selecionado
-SistemaPagBank --> UC3 : Retorna QR Code
+UC2 --> UC3 : PIX
+UC2 --> UC4 : Ko-fi
+UC3 --> PagBank : API
+UC4 --> KoFi : API
+PagBank --> UC3 : QR Code
+KoFi --> UC4 : Confirmação
 
+Administrador --> UC5
 Administrador --> UC6
-Administrador --> UC7
 
-UC3 .> SistemaPagBank : API call
+note right of PagBank
+  Processa pagamentos PIX
+end note
+
+note right of KoFi
+  Processa pagamentos recorrentes
+  via cartão
+end note
 @enduml

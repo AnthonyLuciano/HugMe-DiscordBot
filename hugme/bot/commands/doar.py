@@ -16,7 +16,7 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
             custom_id="pix_donation_modal",
             timeout=180.0
         )
-        self.ngrok_url = os.getenv('REDIRECT_URL')
+        self.redirect = os.getenv('REDIRECT_URL')
         
     amount = TextInput(
         label="Valor da Doação (R$)",
@@ -92,7 +92,7 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                     },
                     "expiration_date": expiration
                 }],
-                "notification_urls": [f"{self.ngrok_url}/pagbank-webhook"],
+                "notification_urls": [f"{self.redirect}/pagbank-webhook"],
                 "customer": {
                     "name": str(interaction.user),
                     "email": email,
