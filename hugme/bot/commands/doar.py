@@ -176,7 +176,7 @@ class DMConfirmationView(discord.ui.View):
             color=discord.Color.green()
         )
         view = DoarView(self.bot)  # View normal com botões PIX/Ko-fi
-        await interaction.response.edit_message(embed=embed, view=view, ephemeral = True)
+        await interaction.response.edit_message(embed=embed, view=view)
 
     @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
