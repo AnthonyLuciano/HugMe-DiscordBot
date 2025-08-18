@@ -1,7 +1,8 @@
 import json
 import re, discord, logging, os, httpx
+from bot.config import Config as app_config
 from bot.database import SessionLocal
-from bot.database.models import Apoiador
+from bot.database.models import Apoiador, PixConfig
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta, timezone
 from discord.ext import commands
@@ -11,44 +12,24 @@ logger = logging.getLogger(__name__)
 
 # --- Modal de Doação (Formulário Pix) ---
 class DonationModal(Modal, title="Fazer Doação via Pix"):
-    def __init__(self):
+    def __init__(self, bot):
         super().__init__(
             custom_id="pix_donation_modal",
             timeout=180.0
         )
+        self.bot = bot
         self.redirect = os.getenv('REDIRECT_URL')
         
     amount = TextInput(
-        label="Valor da Doação (R$)",
+        label="Valor da Doação Esperada <3 (R$)",
         placeholder="Ex: 10.00",
         required=True
     )
-    email = TextInput(
-        label="Seu Email",
-        placeholder="email@exemplo.com",
-        required=True
-    )
-    phone = TextInput(
-        label="Teleone (Com DDD)",
-        placeholder="11999999999",
-        required=True,
-        min_length=11,
-        max_length=11,
-    )
-    cpf = TextInput(
-        label="CPF",
-        placeholder="12345678909",
-        required=True,
-        min_length=11,
-        max_length=11
-    )
+   
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
             amount = float(self.amount.value)
-            phone = self.phone.value
-            email = self.email.value
-            cpf = self.cpf.value
 
             reference_id = f"doacao_discord_user_{interaction.user.id}"
             amount_cents = int(amount * 100)
@@ -60,11 +41,9 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                     guild_id=guild_id,
                     id_pagamento=reference_id,
                     tipo_apoio="pix",
-                    email_doador=email,
-                    cpf_doador=cpf,
-                    telefone_doador=phone,
                     valor_doacao=amount_cents,
-                    data_inicio=datetime.now(timezone.utc)
+                    data_inicio=datetime.now(timezone.utc),
+                    ja_pago=False
                 )
                 session.add(apoiador)
                 try:
@@ -82,62 +61,16 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
             brasilia_tz = timezone(brasilia_offset)
             expiration = (datetime.now(brasilia_tz) + timedelta(days=180)).isoformat()
             
-            payment_data = {
-                "reference_id": reference_id,
-                "description": "Apoio Voluntário à Comunidade",
-                "qr_codes": [{
-                    "amount": {
-                        "value": amount_cents,
-                        "currency": "BRL"
-                    },
-                    "expiration_date": expiration
-                }],
-                "notification_urls": [f"{self.redirect}/pagbank-webhook"],
-                "customer": {
-                    "name": str(interaction.user),
-                    "email": email,
-                    "tax_id": cpf,
-                    "phones": [{
-                        "country": "55",
-                        "area": phone[:2],
-                        "number": phone[2:],
-                        "type": "MOBILE"
-                    }]
-                },
-                "metadata": {
-                    "transaction_type": "donation",
-                    "platform": "discord_community"
-                }
-            }
-            logger.info(
-                "JSON enviado ao PagBank:\n%s", 
-                json.dumps(payment_data, indent=2, ensure_ascii=False)
-            )
-            headers = {
-                "Authorization": f"Bearer {os.getenv('PAGBANK_API_KEY')}",
-                "Content-Type": "application/json"
-            }
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                try:
-                    response = await client.post(
-                        f"{os.getenv('PAGBANK_ENDPOINT')}/orders",
-                        json=payment_data,
-                        headers=headers
-                    )
-                    response.raise_for_status()
-                    payment_info = response.json()
-                except httpx.RequestError as e:
-                    logger.error(f"Falha na conexão com PagBank: {str(e)}")
-                    await interaction.followup.send(
-                        "⚠️ Serviço de pagamento temporariamente indisponível. Tente novamente mais tarde.",
-                    ephemeral=True
-                    )
-                    return
-
-            # Pega o QR Code
-            qr_code_url = payment_info["qr_codes"][0]["links"][0]["href"]
-            text_key = payment_info["qr_codes"][0]["text"]
+            with SessionLocal() as session:
+                config = session.query(PixConfig).first()
+                if not config:
+                    raise ValueError("Configuração PIX não encontrada no banco de dados.")
+                chave = config.chave
+                image_url = config.static_qr_url
+                if not image_url:
+                    raise ValueError("URL do QR Code PIX não configurada.")
+                if not chave:
+                    raise ValueError("Chave PIX não configurada.")
 
             embed = discord.Embed(
                 title=f"💰 Doação de R${amount:.2f} via PIX",
@@ -145,11 +78,44 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                 color=0x32CD32
             )
             embed.add_field(name="Valor", value=f"R$ {amount:.2f}", inline=True)
-            embed.add_field(name="Copia e Cola", value=f"`{text_key}`", inline=False)
-            embed.set_image(url=qr_code_url)
-
+            embed.add_field(name="Copia e Cola", value=f"`{chave}`", inline=False)
+            embed.set_image(url=image_url)
+            
             await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(
+                "⏳ Atenção: sua doação pode levar alguns minutos para ser processada. "
+                "Obrigado pelo apoio! 🤗",
+                ephemeral=True
+                )
 
+            
+            channel_id = app_config.DONO_LOG_CHANNEL
+            donolog = await self.bot.fetch_channel(channel_id)
+            
+            if donolog:
+                view = View(timeout=None)
+                view.add_item(Button(
+                    style=discord.ButtonStyle.success,
+                    label="Sim (Confirmar Pagamento)",
+                    custom_id=f"confirm_payment_{reference_id}"
+                ))
+                view.add_item(Button(
+                    style=discord.ButtonStyle.danger,
+                    label="Não",
+                    custom_id=f"reject_payment_{reference_id}"
+                ))
+                
+                notification_embed = discord.Embed(
+                    title="📊 Nova Doação Recebida",
+                    description=f"**Usuário:** {interaction.user.mention} (`{interaction.user.id}`)\n"
+                    f"**Valor:** R${amount:.2f} \n\n",
+                    color=0x00FF00
+                )
+                await donolog.send(
+                    content="Nova doação registrada!",
+                    embeds=[notification_embed],
+                    view=view
+                )
         except Exception as e:
             logger.error(f"Erro ao processar doação: {e}")
             await interaction.response.send_message(
@@ -195,7 +161,7 @@ class DoarView(View):
 
     @discord.ui.button(label="Pix", style=discord.ButtonStyle.green, custom_id="doar_pix")
     async def doar_pix_button(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.send_modal(DonationModal())
+        await interaction.response.send_modal(DonationModal(bot=self.bot))
 
     @discord.ui.button(label="☕ Doar via Ko-fi", style=discord.ButtonStyle.secondary, custom_id="doar_kofi")
     async def doar_kofi_button(self, interaction: discord.Interaction, button: Button):
@@ -221,6 +187,25 @@ class DoarCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if not interaction.data or "custom_id" not in interaction.data:
+            return
+        custom_id = interaction.data["custom_id"]
+        if custom_id.startswith("confirm_payment_"):
+            reference_id = custom_id.replace("confirm_payment_", "")
+            await interaction.response.send_message(
+                f"✅ Pagamento confirmado para referência {reference_id}",
+                ephemeral=True
+                )
+        elif custom_id.startswith("reject_payment_"):
+            reference_id = custom_id.split("_")[2]
+            await interaction.response.send_message(
+                f"❌ Pagamento rejeitado para referência {reference_id}",
+                ephemeral=True
+            )
+            
+            
     @commands.hybrid_command(name="doar", description="Inicie o processo de doação para a comunidade")
     async def doar(self, ctx: commands.Context):
         try:

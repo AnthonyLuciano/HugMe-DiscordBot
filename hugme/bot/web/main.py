@@ -526,9 +526,6 @@ async def legacy_webhook(request: Request):
     logger.warning("Legacy webhook endpoint called, redirecting to pagbank-webhook")
     return await pagbank_webhook(request)
 
-from fastapi import Request, HTTPException
-from datetime import datetime, timedelta, timezone
-import logging
 
 logger = logging.getLogger(__name__)
 @app.post("/kofi-webhook")

@@ -14,6 +14,9 @@ class Config:
     KOFI_ENDPOINT = getenv('KOFI_ENDPOINT')
     PAGBANK_ENDPOINT = getenv('PAGBANK_ENDPOINT')
     DISCORD_DONOHOOK = getenv('DISCORD_DONOHOOK_URL')
+    DONO_LOG_CHANNEL = getenv('KOFI_LOG_CHANNEL_ID')
+    DEEP_API = getenv('DEEP_API')
+    DEEP_KEY = getenv('DEEP_KEY')
 
     # Webhook and security settings
     WEBHOOK_SECRET = getenv('WEBHOOK_SECRET')

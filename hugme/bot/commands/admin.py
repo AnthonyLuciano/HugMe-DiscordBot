@@ -9,10 +9,12 @@ logger = logging.getLogger(__name__)
 
 def is_owner():
     async def predicate(ctx):
+        mod_id = os.getenv('TRUSTED_MOD_ID')
         dev_id = os.getenv('DEV_ID')
         if not dev_id:
-            raise commands.CheckFailure("Variável DEV_ID não configurada")
-        return ctx.author.id == int(dev_id)
+            if not mod_id:
+                raise ValueError("Both DEV_ID and MOD_ID must be set in environment variables")
+        return ctx.author.id == int(dev_id) or ctx.author.id == int(mod_id)
     return commands.check(predicate)
 
 class AdminCommands(commands.Cog):
@@ -20,9 +22,9 @@ class AdminCommands(commands.Cog):
         self.bot = bot
 
     @is_owner()
-    @commands.hybrid_command(name="set_qrcode", description="[ADMIN] Atualiza a imagem do QR Code PIX")
-    async def set_qrcode(self, ctx: commands.Context, image_url: str):
-        """Update the static QR code image URL in database"""
+    @commands.hybrid_command(name="set_qrcode", description="[ADMIN] Atualiza a imagem do QR Code PIX e chave estática")
+    async def set_qrcode(self, ctx: commands.Context, image_url: str, chave: str = None):
+        """Update the static QR code image URL and PIX key in database"""
         try:
             if not image_url.startswith(('http://', 'https://')):
                 raise ValueError("URL deve começar com http:// ou https://")
@@ -31,16 +33,21 @@ class AdminCommands(commands.Cog):
                 config = session.query(PixConfig).first()
                 if not config:
                     config = PixConfig(
-                        static_qr_url=image_url,  # Correto: atribuição no construtor
-                        chave="hugmebotdev@gmail.com"
+                        static_qr_url=image_url,
+                        chave=chave if chave else "hugmebotdev@gmail.com"
                     )
                 else:
                     setattr(config, 'static_qr_url', image_url)
+                    if chave:
+                        setattr(config, 'chave', chave)
                 session.add(config)
                 session.commit()
 
-            await ctx.send(f"✅ QR Code atualizado para: {image_url}", ephemeral=True)
-            logger.info(f"QR Code atualizado por {ctx.author} para {image_url}")
+            await ctx.send(f"✅ QR Code atualizado para: {image_url}" + 
+                         (f" e chave PIX para: {chave}" if chave else ""), 
+                         ephemeral=True)
+            logger.info(f"QR Code atualizado por {ctx.author} para {image_url}" + 
+                       (f" e chave PIX para: {chave}" if chave else ""))
         except Exception as e:
             await ctx.send(f"❌ Erro ao atualizar QR Code: {str(e)}", ephemeral=True)
             logger.error(f"Erro ao atualizar QR Code: {e}")
