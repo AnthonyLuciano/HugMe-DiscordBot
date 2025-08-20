@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re, discord, logging, os, httpx
 from bot.config import Config as app_config
@@ -7,8 +8,14 @@ from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta, timezone
 from discord.ext import commands
 from discord.ui import View, Button, Modal, TextInput
+from discord.utils import sleep_until
 
 logger = logging.getLogger(__name__)
+def get_brasilia_time():
+        brasilia_offset = timedelta(hours=-3)
+        brasilia_tz = timezone(brasilia_offset)
+        return datetime.now(brasilia_tz)
+
 
 # --- Modal de Doação (Formulário Pix) ---
 class DonationModal(Modal, title="Fazer Doação via Pix"):
@@ -25,53 +32,74 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
         placeholder="Ex: 10.00",
         required=True
     )
-   
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
-            amount = float(self.amount.value)
+            # --- Validação do valor ---
+            try:
+                amount = float(self.amount.value)
+            except ValueError:
+                await interaction.response.send_message(
+                    "❌ Valor inválido. Por favor, insira um número válido.",
+                    ephemeral=True
+                )
+                return
 
             reference_id = f"doacao_discord_user_{interaction.user.id}"
             amount_cents = int(amount * 100)
             guild_id = str(interaction.guild.id) if interaction.guild else "0"
-            
+
+            # --- Salva ou atualiza no banco ---
             with SessionLocal() as session:
-                apoiador = Apoiador(
-                    discord_id=str(interaction.user.id),
-                    guild_id=guild_id,
-                    id_pagamento=reference_id,
-                    tipo_apoio="pix",
-                    valor_doacao=amount_cents,
-                    data_inicio=datetime.now(timezone.utc),
-                    ja_pago=False
-                )
-                session.add(apoiador)
                 try:
-                    session.commit()
-                except IntegrityError:
-                    session.rollback()
                     apoiador = session.query(Apoiador).filter_by(
                         discord_id=str(interaction.user.id),
                         guild_id=guild_id
                     ).first()
+                    
                     if apoiador:
+                        # Atualiza apenas o id_pagamento e dados
                         apoiador.id_pagamento = reference_id
-                        session.commit()
-            brasilia_offset = timedelta(hours=-3)
-            brasilia_tz = timezone(brasilia_offset)
-            expiration = (datetime.now(brasilia_tz) + timedelta(days=180)).isoformat()
-            
+                        apoiador.tipo_apoio = "pix"
+                        apoiador.valor_doacao = amount_cents
+                        apoiador.data_inicio = datetime.now(timezone.utc)
+                        apoiador.ja_pago = False
+                    else:
+                        # Cria novo registro
+                        apoiador = Apoiador(
+                            discord_id=str(interaction.user.id),
+                            guild_id=guild_id,
+                            id_pagamento=reference_id,
+                            tipo_apoio="pix",
+                            valor_doacao=amount_cents,
+                            data_inicio=datetime.now(timezone.utc),
+                            ja_pago=False
+                        )
+                        session.add(apoiador)
+
+                    session.commit()
+                except Exception as e:
+                    session.rollback()
+                    logger.error(f"Erro ao salvar doação no banco: {e}")
+                    await interaction.response.send_message(
+                        "❌ Erro ao registrar a doação. Tente novamente mais tarde.",
+                        ephemeral=True
+                    )
+                    return
+
+            # --- Busca configuração PIX ---
             with SessionLocal() as session:
                 config = session.query(PixConfig).first()
                 if not config:
-                    raise ValueError("Configuração PIX não encontrada no banco de dados.")
+                    await interaction.response.send_message(
+                        "❌ Configuração PIX não encontrada.",
+                        ephemeral=True
+                    )
+                    return
                 chave = config.chave
                 image_url = config.static_qr_url
-                if not image_url:
-                    raise ValueError("URL do QR Code PIX não configurada.")
-                if not chave:
-                    raise ValueError("Chave PIX não configurada.")
 
+            # --- Envia embed pro usuário ---
             embed = discord.Embed(
                 title=f"💰 Doação de R${amount:.2f} via PIX",
                 description="Escaneie o QR Code ou copie o código abaixo:",
@@ -80,35 +108,69 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
             embed.add_field(name="Valor", value=f"R$ {amount:.2f}", inline=True)
             embed.add_field(name="Copia e Cola", value=f"`{chave}`", inline=False)
             embed.set_image(url=image_url)
-            
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            await interaction.followup.send(
-                "⏳ Atenção: sua doação pode levar alguns minutos para ser processada. "
-                "Obrigado pelo apoio! 🤗",
-                ephemeral=True
-                )
 
+            #footer pro usuario e timer de auto rejeição
+            timeout = get_brasilia_time() + timedelta(minutes=5)
+            restante = timeout - get_brasilia_time()
+            mins, segs, = divmod(int(restante.total_seconds()), 60)
+            embed.set_footer(text=f"⏳ Confirmação Manual pendente | Tempo restante: {mins}m {segs}s")
             
+            user_view = View(timeout=None)
+            user_view.add_item(Button(
+                style=discord.ButtonStyle.success,
+                label="já paguei",
+                custom_id=f"user_paid_{reference_id}"))
+            user_view.add_item(Button(
+                style=discord.ButtonStyle.danger,
+                label="Cancelar Doação",
+                custom_id=f"user_cancel_{reference_id}"))
+            
+            await interaction.response.send_message(embed=embed, ephemeral=False)
+            user_message = await interaction.original_response()
+            
+            async def autodelete(msg: discord.Message, delay_minutos: int = 10):
+                delete_time = get_brasilia_time() + timedelta(minutes=delay_minutos)
+                while True:
+                    if get_brasilia_time() >= delete_time:
+                        try:
+                            await msg.delete()
+                        except discord.NotFound:
+                            pass
+                        except discord.Forbidden:
+                            pass
+                        break
+                    await asyncio.sleep(5)
+            asyncio.create_task(autodelete(user_message))
+                    
+                
+            # inicia timer de rejeição automática
+            doar_cog = self.bot.get_cog("DoarCommands")
+            if doar_cog:
+                asyncio.create_task(doar_cog.update_timer_embed(
+                    message=user_message,
+                    reference_id=reference_id,
+                    timeout=timeout
+                    ))
+
+            # --- Notifica admins e inicia timer ---
             channel_id = app_config.DONO_LOG_CHANNEL
             donolog = await self.bot.fetch_channel(channel_id)
-            
             if donolog:
                 view = View(timeout=None)
                 view.add_item(Button(
                     style=discord.ButtonStyle.success,
-                    label="Sim (Confirmar Pagamento)",
+                    label="Confirmar Pagamento",
                     custom_id=f"confirm_payment_{reference_id}"
                 ))
                 view.add_item(Button(
                     style=discord.ButtonStyle.danger,
-                    label="Não",
+                    label="Rejeitar Pagamento",
                     custom_id=f"reject_payment_{reference_id}"
                 ))
                 
                 notification_embed = discord.Embed(
                     title="📊 Nova Doação Recebida",
-                    description=f"**Usuário:** {interaction.user.mention} (`{interaction.user.id}`)\n"
-                    f"**Valor:** R${amount:.2f} \n\n",
+                    description=f"**Usuário:** {interaction.user.mention} (`{interaction.user.id}`)\n**Valor:** R${amount:.2f}\n\n",
                     color=0x00FF00
                 )
                 await donolog.send(
@@ -116,6 +178,7 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                     embeds=[notification_embed],
                     view=view
                 )
+
         except Exception as e:
             logger.error(f"Erro ao processar doação: {e}")
             await interaction.response.send_message(
@@ -123,6 +186,8 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                 ephemeral=True
             )
 
+
+# --- Views para DM ---
 class DMConfirmationView(discord.ui.View):
     def __init__(self, bot):
         super().__init__(timeout=180.0)
@@ -130,7 +195,6 @@ class DMConfirmationView(discord.ui.View):
 
     @discord.ui.button(label="Sim, Continuar", style=discord.ButtonStyle.green)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Mostra o mesmo embed de opções que seria exibido em servidores
         embed = discord.Embed(
             title="💖 Apoie Nossa Comunidade!",
             description=(
@@ -141,7 +205,7 @@ class DMConfirmationView(discord.ui.View):
             ),
             color=discord.Color.green()
         )
-        view = DoarView(self.bot)  # View normal com botões PIX/Ko-fi
+        view = DoarView(self.bot)
         await interaction.response.edit_message(embed=embed, view=view)
 
     @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.red)
@@ -150,9 +214,10 @@ class DMConfirmationView(discord.ui.View):
             content="❌ Doação cancelada.",
             view=None,
             embed=None,
-            ephemeral = True
+            ephemeral=True
         )
-    
+
+
 class DoarView(View):
     def __init__(self, bot):
         super().__init__(timeout=180)
@@ -165,14 +230,13 @@ class DoarView(View):
 
     @discord.ui.button(label="☕ Doar via Ko-fi", style=discord.ButtonStyle.secondary, custom_id="doar_kofi")
     async def doar_kofi_button(self, interaction: discord.Interaction, button: Button):
-        # Embed de aviso antes de redirecionar
         embed = discord.Embed(
             title="☕ Doação via Ko-fi",
             description=(
                 "Obrigado por considerar doar via Ko-fi!\n\n"
                 "**⚠️Antes de prosseguir⚠️:**\n"
-                "Quando for Doar, Coloque o seu nome de usuario do discord\n"   
-                "Caso contrario tera que ser feito verificação manual\n"
+                "Quando for Doar, coloque o seu nome de usuário do Discord.\n"
+                "Caso contrário, será feita verificação manual.\n"
                 "- Visite o link abaixo para continuar.\n\n"
                 "[Clique aqui para doar no Ko-fi](https://ko-fi.com/W7W81J60WA)"
             ),
@@ -181,52 +245,132 @@ class DoarView(View):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-
 # --- Comando /doar ---
 class DoarCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.timer_tasks = {}
+
+    async def update_timer_embed(self, message: discord.Message, reference_id: str, timeout: datetime):
+        try:
+            if not message.embeds:
+                return
+
+            embed = message.embeds[0]
+            
+            async def timer_task():
+                try:
+                    while True:
+                        remaining = timeout - get_brasilia_time()
+                        total_secs = int(remaining.total_seconds())
+                
+                        if total_secs <= 0:
+                            embed.set_footer(text="⌛ Pagamento não confirmado (expirado)")
+                            await message.edit(embeds=[embed], view=None)
+                            break
+                
+                        mins, secs = divmod(total_secs, 60)
+                        embed.set_footer(text=f"⏳ Confirmação pendente | Tempo restante: {mins}m {secs}s")
+                        await message.edit(embeds=[embed])
+                        await asyncio.sleep(5)
+                except asyncio.CancelledError:
+                    pass
+                except Exception as e:
+                    logger.info(f"erro no timer task: {e}")
+                finally:
+                    if reference_id in self.timer_tasks:
+                        del self.timer_tasks[reference_id]
+                        
+                task = asyncio.create_task(timer_task())
+                self.timer_tasks[reference_id] = task
+                
+        except Exception as e:
+            logger.error(f"Erro no timer embed: {e}")
+            if reference_id in self.timer_tasks:
+                del self.timer_tasks[reference_id]
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
         if not interaction.data or "custom_id" not in interaction.data:
             return
+
         custom_id = interaction.data["custom_id"]
+        
+        if custom_id.startswith("user_paid_"):
+            reference_id = custom_id.replace("user_paid_", "")
+            await interaction.response.send_message(
+                "✅ Obrigado pelo pagamento! Aguarde a confirmação dos administradores.",
+                ephemeral=True
+            )
+
+        elif custom_id.startswith("user_cancel_"):
+            reference_id = custom_id.replace("user_cancel_", "")
+            # Cancela timer se existir
+            if reference_id in self.timer_tasks:
+                self.timer_tasks[reference_id].cancel()
+            
+            await interaction.response.edit_message(
+                content="❌ Doação cancelada pelo usuário.",
+                view=None,
+                embed=None
+            )
+
         if custom_id.startswith("confirm_payment_"):
             reference_id = custom_id.replace("confirm_payment_", "")
+            message = interaction.message
+
+            if reference_id in self.timer_tasks:
+                self.timer_tasks[reference_id].cancel()
+            
+            embed = message.embeds[0]
+            embed.set_footer(text="✅ Pagamento confirmado")
+            await message.edit(embeds=[embed], view=None)
+
+            with SessionLocal() as session:
+                apoiador = session.query(Apoiador).filter_by(id_pagamento=reference_id).first()
+                if apoiador:
+                    apoiador.ja_pago = True
+                    apoiador.ultimo_pagamento = get_brasilia_time()
+                    session.commit()
+
             await interaction.response.send_message(
                 f"✅ Pagamento confirmado para referência {reference_id}",
                 ephemeral=True
-                )
+            )
+
         elif custom_id.startswith("reject_payment_"):
-            reference_id = custom_id.split("_")[2]
+            reference_id = custom_id.replace("reject_payment_", "")
+            embed = interaction.message.embeds[0]
+            embed.set_footer(text="❌ Pagamento rejeitado")
+            if reference_id in self.timer_tasks:
+                self.timer_tasks[reference_id].cancel()
+            await interaction.message.edit(embeds=[embed], view=None)
+
             await interaction.response.send_message(
                 f"❌ Pagamento rejeitado para referência {reference_id}",
                 ephemeral=True
             )
-            
-            
+
     @commands.hybrid_command(name="doar", description="Inicie o processo de doação para a comunidade")
     async def doar(self, ctx: commands.Context):
         try:
             if not ctx.author:
                 raise ValueError("Contexto inválido - author ausente")
-            
+
             if not ctx.guild:
                 embed = discord.Embed(
                     title="⚠️ Doação via Mensagem Direta",
                     description=(
                         "Doações em DMs **não concedem recompensas** em servidores.\n"
-                        "Caso deseje tais recompenças use o comando no servidor \n"
-                        "Ou notifique um Admin ou o Desenvolvedor no servidor de sua doação\n -MrMedicMain(dev)\n\n"
+                        "Caso deseje tais recompensas use o comando no servidor.\n"
+                        "Ou notifique um Admin ou o Desenvolvedor no servidor de sua doação.\n\n"
                         "**Deseja continuar mesmo assim?**"
                     ),
                     color=discord.Color.orange()
                 )
                 view = DMConfirmationView(self.bot)
-                await ctx.send(embed=embed, view=view, ephemeral = True)
+                await ctx.send(embed=embed, view=view, ephemeral=True)
                 return
-
 
             embed = discord.Embed(
                 title="💖 Apoie Nossa Comunidade!",
@@ -238,9 +382,8 @@ class DoarCommands(commands.Cog):
                 ),
                 color=discord.Color.green()
             )
-        
             view = DoarView(self.bot)
-            await ctx.send(embed=embed, view=view, ephemeral = True)
+            await ctx.send(embed=embed, view=view, ephemeral=True)
 
         except discord.Forbidden:
             await ctx.send("❌ Sem permissões para enviar mensagens aqui!", ephemeral=True)
@@ -250,6 +393,8 @@ class DoarCommands(commands.Cog):
         except Exception as e:
             logger.error(f"Erro inesperado em doar: {str(e)}", exc_info=True)
             await ctx.send("❌ Falha ao processar o comando. Notifique os administradores.", ephemeral=True)
+
+
 # --- Setup ---
 async def setup(bot):
     await bot.add_cog(DoarCommands(bot))
