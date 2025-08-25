@@ -116,20 +116,58 @@ class VerificacaoMembro:
             return "Erro ao verificar status"
 
     async def atribuir_cargo_apos_pagamento(self, discord_id: str, guild_id: int, cargo_id: int) -> bool:
-        guild = self.bot.get_guild(guild_id)
-        if not guild:
-            return False
-        
-        member = guild.get_member(int(discord_id))
-        if not member:
-            return False
-        
-        cargo = guild.get_role(cargo_id)
-        if not cargo:
-            return False
-        
         try:
+            guild = self.bot.get_guild(guild_id)
+            if not guild:
+                logger.error(f"Servidor {guild_id} não encontrado")
+                return False
+        
+        # Recarregar o servidor para garantir que temos os dados mais recentes
+            await guild.chunk()
+        
+            member = guild.get_member(int(discord_id))
+            if not member:
+                logger.error(f"Membro {discord_id} não encontrado no servidor {guild_id}")
+            # Tentar buscar o membro via API
+                try:
+                    member = await guild.fetch_member(int(discord_id))
+                except discord.NotFound:
+                    logger.error(f"Membro {discord_id} realmente não existe no servidor")
+                    return False
+                except discord.HTTPException as e:
+                    logger.error(f"Erro ao buscar membro: {e}")
+                    return False
+        
+        # Buscar cargo de forma mais robusta
+            cargo = None
+            try:
+                cargo = guild.get_role(int(cargo_id))
+                if not cargo:
+                # Listar todos os cargos para debugging
+                    all_roles = [f"{r.name} ({r.id})" for r in guild.roles]
+                    logger.info(f"Cargos disponíveis no servidor: {', '.join(all_roles)}")
+                    logger.error(f"Cargo ID {cargo_id} não encontrado entre {len(guild.roles)} cargos")
+                    return False
+            except Exception as e:
+                logger.error(f"Erro ao buscar cargo: {e}")
+                return False
+        
+        # Verificar permissões do bot
+            if not guild.me.guild_permissions.manage_roles:
+                logger.error(f"Bot sem permissão para gerenciar cargos no servidor {guild_id}")
+                return False
+        
+            if guild.me.top_role.position <= cargo.position:
+                logger.error(f"Cargo do bot ({guild.me.top_role.position}) não é superior ao cargo {cargo.name} ({cargo.position})")
+                return False
+        
+        # Verificar se o membro já tem o cargo
+            if cargo in member.roles:
+                logger.info(f"Membro {member.display_name} já tem o cargo {cargo.name}")
+                return True
+        
             await member.add_roles(cargo)
+            logger.info(f"Cargo {cargo.name} atribuído para {member.display_name}")
         
         # Atualiza o status no banco de dados
             apoiador = await self.obter_apoiador(discord_id, str(guild_id))
@@ -140,6 +178,13 @@ class VerificacaoMembro:
                     session.commit()
         
             return True
+        
+        except discord.Forbidden:
+            logger.error(f"Permissão negada para atribuir cargo no servidor {guild_id}")
+            return False
+        except discord.HTTPException as e:
+            logger.error(f"Erro HTTP ao atribuir cargo: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Erro ao atribuir cargo: {e}")
+            logger.error(f"Erro inesperado ao atribuir cargo: {e}")
             return False

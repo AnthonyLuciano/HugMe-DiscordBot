@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re, discord, logging, os, httpx
+from bot.servicos.VerificacaoMembro import VerificacaoMembro
 from bot.config import Config as app_config
 from bot.database import SessionLocal
 from bot.database.models import Apoiador, PixConfig
@@ -22,10 +23,17 @@ def get_brasilia_time():
 async def disable_admin_buttons(message: discord.Message):
     if not message.components:
         return
+    view = View(timeout=None)
     for row in message.components:
         for button in row.children:
-            button.disabled = True
-    await message.edit(view=message.components)
+            new_button = Button(
+            style = button.style,
+            label = button.label,
+            custom_id=button.custom_id,
+            disabled=True
+            )
+            view.add_item(new_button)
+    await message.edit(view=view)
 
 # --- Modal de Doação (Formulário Pix) ---
 class DonationModal(Modal, title="Fazer Doação via Pix"):
@@ -276,6 +284,7 @@ class DoarCommands(commands.Cog):
         self.bot = bot
         self.timer_tasks = {}
         self.admin_messages = {}
+        self.verificador = VerificacaoMembro(bot)
 
     async def update_timer_embed(self, message: discord.Message, reference_id: str, timeout: datetime):
         try:
@@ -362,7 +371,18 @@ class DoarCommands(commands.Cog):
                     apoiador.ja_pago = True
                     apoiador.ultimo_pagamento = get_brasilia_time()
                     session.commit()
-
+                    cargo_apoiador_id = app_config.APOIADOR_ID
+                    logger.info(f"Tentando atribuir cargo {cargo_apoiador_id} para {apoiador.discord_id} no servidor {apoiador.guild_id}")
+                    sucess = await self.verificador.atribuir_cargo_apos_pagamento(
+                        apoiador.discord_id,
+                        int(apoiador.guild_id),
+                        cargo_apoiador_id
+                    )
+                    
+                    if not sucess:
+                        logger.error(f"Falha ao atribuir cargo de apoiador para {apoiador.discord_id} no servidor {apoiador.guild_id}")
+                    else:
+                        logger.info(f"Cargo atribuído automaticamente para {apoiador.discord_id}")
             admin_msg = self.admin_messages.get(reference_id)
             if admin_msg:
                 await disable_admin_buttons(admin_msg)

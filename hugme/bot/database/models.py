@@ -39,6 +39,7 @@ class Apoiador(Base):
     valor_doacao: Mapped[int | None] = mapped_column(Integer)  # Em centavos
     data_pagamento: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     metodo_pagamento: Mapped[str | None] = mapped_column(String(20))
+    email_doador: Mapped[str | None] = mapped_column(String(100))
 
 
     def __repr__(self) -> str:
