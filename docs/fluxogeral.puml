@@ -1,0 +1,45 @@
+@startuml FluxoGeral
+participant Usuário
+participant Bot
+participant "API PagBank" as PagBank
+participant BancoDados
+participant "Web Admin" as Web
+participant "API Discord" as DiscordAPI
+
+' Fluxo de Doação via PIX
+Usuário -> Bot: /doar
+Bot -> Usuário: Mostra confirmação (DMConfirmationView)
+Usuário -> Bot: Confirma doação
+Bot -> PagBank: POST /orders (com dados doação)
+PagBank --> Bot: Resposta com QR Code
+Bot -> BancoDados: Registra transação
+Bot --> Usuário: Mostra QR Code
+
+' Fluxo de Verificação de Cargo
+Usuário -> Bot: /verificarcargo (staff only)
+Bot -> DiscordAPI: Verifica permissões admin
+DiscordAPI --> Bot: Confirma admin
+Bot -> Usuário: Cria botão de verificação
+Usuário -> Bot: Clica para verificar cargo
+Bot -> BancoDados: Verifica tempo no servidor
+Bot -> DiscordAPI: Atribui cargo
+
+' Fluxo Web Admin
+Web -> Bot: Acessa /admin
+Bot -> DiscordAPI: Verifica permissões
+DiscordAPI --> Bot: Confirma admin
+Bot -> BancoDados: Obtém métricas e apoiadores
+Bot --> Web: Renderiza admin.html
+
+' Fluxo de Comandos Básicos
+Usuário -> Bot: /check
+Bot --> Usuário: "Bot está online!"
+
+Usuário -> Bot: /ajuda
+Bot --> Usuário: Mostra embed com comandos
+
+' Fluxo de Configuração QR Code (Admin)
+Usuário -> Bot: /set_qrcode <url>
+Bot -> BancoDados: Atualiza URL do QR Code
+Bot --> Usuário: Confirmação de atualização
+@enduml

@@ -6,14 +6,17 @@ load_dotenv()
 class Config:
     # Required core settings
     DISCORD_TOKEN = getenv('DISCORD_BOT_TOKEN')
-    PAGBANK_API_KEY = getenv('PAGBANK_API_KEY')
     DATABASE_URL = getenv('DATABASE_URL')
     APPLICATION_ID = getenv('APPLICATION_ID')
-    PAGBANK_EMAIL = getenv('PAGBANK_EMAIL')
     KOFI_TOKEN = getenv('KOFI_TOKEN')
     KOFI_ENDPOINT = getenv('KOFI_ENDPOINT')
-    PAGBANK_ENDPOINT = getenv('PAGBANK_ENDPOINT')
     DISCORD_DONOHOOK = getenv('DISCORD_DONOHOOK_URL')
+    DONO_LOG_CHANNEL = getenv('KOFI_LOG_CHANNEL_ID')
+    DEEP_API = getenv('DEEP_API')
+    DEEP_KEY = getenv('DEEP_KEY')
+    
+    #Discord
+    APOIADOR_ID = getenv('APOIADOR_CARGO_ID')
 
     # Webhook and security settings
     WEBHOOK_SECRET = getenv('WEBHOOK_SECRET')
@@ -26,7 +29,7 @@ class Config:
     BASE_URL = NGROK_URL if USE_NGROK else FLY_URL
 
     def __init__(self):
-        if not all([self.DISCORD_TOKEN, self.PAGBANK_API_KEY, self.DATABASE_URL]):
+        if not all([self.DISCORD_TOKEN, self.DEEP_KEY, self.DATABASE_URL]):
             raise ValueError("Missing required environment variables")
         if not self.BASE_URL:
             raise ValueError("Missing BASE_URL configuration")

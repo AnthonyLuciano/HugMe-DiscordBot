@@ -34,14 +34,13 @@ class Apoiador(Base):
     nivel: Mapped[int] = mapped_column(Integer, default=1)
     data_expiracao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cargo_atribuido: Mapped[bool] = mapped_column(Boolean, default=False)
-    
-    # Campos adicionais para pagamentos
+    ja_pago: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Campos de pagamento restantes
     valor_doacao: Mapped[int | None] = mapped_column(Integer)  # Em centavos
-    email_doador: Mapped[str | None] = mapped_column(String(100))
-    cpf_doador: Mapped[str | None] = mapped_column(String(14))
-    telefone_doador: Mapped[str | None] = mapped_column(String(20))
     data_pagamento: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     metodo_pagamento: Mapped[str | None] = mapped_column(String(20))
+    email_doador: Mapped[str | None] = mapped_column(String(100))
+
 
     def __repr__(self) -> str:
         return f"<Apoiador(discord_id={self.discord_id}, nivel={self.nivel})>"
