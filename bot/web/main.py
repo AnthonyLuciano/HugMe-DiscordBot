@@ -346,20 +346,24 @@ async def kofi_webhook(request: Request):
             session.add(apoiador)
             session.commit()
             logger.info(f"Apoiador registrado: {discord_id}, tipo={data['type']}, valor={data['amount']}")
-            
-        verificador = VerificacaoMembro(None)
-        cargo_apoiador = app_config.APOIADOR_ID
+        bot = get_bot_instance()
+        if bot:
+            verificador = VerificacaoMembro(bot)
+            cargo_apoiador = app_config.APOIADOR_ID2
         
-        if discord_id and not discord_id.startswith("kofi_anon_"):
-            sucesso = await verificador.atribuir_cargo_apos_pagamento(
-                discord_id,
-                0,
-                cargo_apoiador
-            )
-            if sucesso:
-                logger.info(f"Cargo atribuído automaticamente para {discord_id} via Ko-fi")
-            else:
-                logger.warning(f"Falha ao atribuir cargo para {discord_id} via Ko-fi")
+            if discord_id and not discord_id.startswith("kofi_anon_"):
+                sucesso = await verificador.atribuir_cargo_apos_pagamento(
+                    discord_id,
+                    0,
+                    cargo_apoiador
+                )
+                if sucesso:
+                    logger.info(f"Cargo atribuído automaticamente para {discord_id} via Ko-fi")
+                else:
+                    logger.warning(f"Falha ao atribuir cargo para {discord_id} via Ko-fi")
+        else:
+            logger.warning("Bot instance não disponível para atribuir cargo via Ko-fi")
+
 
 
         donohook_url = app_config.DISCORD_DONOHOOK
