@@ -4,8 +4,8 @@ skinparam monochrome true
 
 actor Usuário
 actor Administrador
-actor "Sistema PagBank" as PagBank
 actor "Sistema Ko-fi" as KoFi
+actor "API DeepSeek" as DeepSeek
 
 rectangle Bot {
   usecase "Iniciar doação" as UC1
@@ -14,26 +14,41 @@ rectangle Bot {
   usecase "Processar pagamento Ko-fi" as UC4
   usecase "Verificar doação" as UC5
   usecase "Gerenciar doações" as UC6
+  usecase "Conversar com IA (HugMeBot)" as UC7
+  usecase "Atribuir cargos automaticamente" as UC8
+  usecase "Painel administrativo web" as UC9
 }
 
 Usuário --> UC1
 Usuário --> UC2
+Usuário --> UC7
 UC2 --> UC3 : PIX
 UC2 --> UC4 : Ko-fi
-UC3 --> PagBank : API
 UC4 --> KoFi : API
-PagBank --> UC3 : QR Code
+UC7 --> DeepSeek : API
 KoFi --> UC4 : Confirmação
+DeepSeek --> UC7 : Resposta
 
 Administrador --> UC5
 Administrador --> UC6
+Administrador --> UC9
 
-note right of PagBank
-  Processa pagamentos PIX
-end note
+UC4 --> UC8 : Doação confirmada
+UC3 --> UC8 : Pagamento verificado
+UC8 --> DiscordAPI : Atribui cargo
 
 note right of KoFi
   Processa pagamentos recorrentes
-  via cartão
+  via cartão + webhook automático
+end note
+
+note right of DeepSeek
+  API de conversação para
+  suporte à comunidade
+end note
+
+note right of UC8
+  Sistema automático de cargos
+  para doadores via PIX e Ko-fi
 end note
 @enduml

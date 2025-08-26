@@ -17,6 +17,7 @@ class Config:
     
     #Discord
     APOIADOR_ID = getenv('APOIADOR_CARGO_ID')
+    APOIADOR_ID2 = getenv('APOIADOR_CARGO_ID2')
 
     # Webhook and security settings
     WEBHOOK_SECRET = getenv('WEBHOOK_SECRET')

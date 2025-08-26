@@ -1,19 +1,32 @@
 @startuml FluxoGeral
 participant Usuário
 participant Bot
-participant "API PagBank" as PagBank
 participant BancoDados
 participant "Web Admin" as Web
 participant "API Discord" as DiscordAPI
+participant "API Ko-fi" as KoFiAPI
+participant "API DeepSeek" as DeepSeek
 
 ' Fluxo de Doação via PIX
 Usuário -> Bot: /doar
 Bot -> Usuário: Mostra confirmação (DMConfirmationView)
 Usuário -> Bot: Confirma doação
-Bot -> PagBank: POST /orders (com dados doação)
-PagBank --> Bot: Resposta com QR Code
-Bot -> BancoDados: Registra transação
-Bot --> Usuário: Mostra QR Code
+Bot -> BancoDados: Registra transação PIX
+Bot --> Usuário: Mostra QR Code estático
+
+' Fluxo de Doação via Ko-fi (Webhook)
+KoFiAPI -> Web: Webhook de confirmação
+Web -> BancoDados: Registra doação Ko-fi
+Web -> Bot: Solicita atribuição de cargo
+Bot -> DiscordAPI: Atribui cargo automaticamente
+Bot -> BancoDados: Marca cargo como atribuído
+
+' Fluxo de Conversação com IA
+Usuário -> Bot: /bot <mensagem>
+Bot -> DeepSeek: Envia prompt
+DeepSeek --> Bot: Retorna resposta
+Bot -> DiscordAPI: Envia resposta mencionando usuário
+Bot -> BancoDados: Log da interação
 
 ' Fluxo de Verificação de Cargo
 Usuário -> Bot: /verificarcargo (staff only)
@@ -42,4 +55,10 @@ Bot --> Usuário: Mostra embed com comandos
 Usuário -> Bot: /set_qrcode <url>
 Bot -> BancoDados: Atualiza URL do QR Code
 Bot --> Usuário: Confirmação de atualização
+
+' Fluxo de Expiração Automática
+Bot -> BancoDados: Verifica apoios expirados (cron)
+BancoDados --> Bot: Lista de expirados
+Bot -> DiscordAPI: Remove cargos expirados
+Bot -> BancoDados: Atualiza status para inativo
 @enduml
