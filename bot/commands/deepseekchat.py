@@ -27,7 +27,7 @@ class DeepseekCommands(commands.Cog):
             
         except Exception as e:
             error_msg = f"❌ Erro ao chamar a API Deepseek: {str(e)}"
-            await ctx.send(f"{error_msg}, avise ao desenvolvedor.", ephemeral=True)
+            await ctx.send("Erro de memoria cheia ou posivelmente API esta fora de serviço, avise ao desenvolvedor.", ephemeral=True)
             await self.log_interaction(ctx.author, mensagem, f"ERRO: {str(e)}")
 
     async def log_interaction(self, user: discord.User, question: str, response: str | None):
