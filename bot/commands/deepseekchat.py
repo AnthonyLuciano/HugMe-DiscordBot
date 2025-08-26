@@ -1,23 +1,81 @@
-import discord, os
+import discord, os, logging
+from os import getenv
 from discord.ext import commands
 import requests
-
+logger = logging.getLogger(__name__)
 
 class DeepseekCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.api_key = os.getenv('DEEP_KEY')
+        self.api_key = getenv('DEEP_KEY')
+        self.log_channel_id=int(getenv('DEEPSEEK_LOG_CHANNEL', 0))
+        self.allowed_channel_id=int(getenv("QUARTO_DO_HUGME", 0))
         if not self.api_key:
             raise ValueError("DEEP_KEY must be set in environment variables")
         
     @commands.hybrid_command(name="bot", description="converse com o Hugme!")
     async def conversar(self, ctx: commands.Context, *, mensagem:str):
+        if self.allowed_channel_id and ctx.channel.id != self.allowed_channel_id:
+            await ctx.send(f"❌ Este comando só pode ser usado no canal designado.", ephemeral=True)
+            return
+        
         try:
             response = await self.call_deepseek_api(mensagem)
-            await ctx.channel.send(response)
+            await ctx.channel.send(f"{ctx.author.mention}{response}")
+            
+            await self.log_interaction(ctx.author, mensagem, response)
+            
         except Exception as e:
-            await ctx.send(f"❌ Erro ao chamar a API Deepseek: {str(e)}, avise ao desenvolvedor.", ephemeral=True)
+            error_msg = f"❌ Erro ao chamar a API Deepseek: {str(e)}"
+            await ctx.send(f"{error_msg}, avise ao desenvolvedor.", ephemeral=True)
+            await self.log_interaction(ctx.author, mensagem, f"ERRO: {str(e)}")
 
+    async def log_interaction(self, user: discord.User, question: str, response: str | None):
+        if not self.log_channel_id:
+            return
+        try:
+            log_channel = self.bot.get_channel(self.log_channel_id)
+            if not log_channel:
+                logger.warning(f"Canal de logs ({self.log_channel_id}) não encontrado")
+                return
+            
+            embed = discord.Embed(
+                title="🤖 Interação com HugMeBot",
+                color=0x00ff00 if response else 0xff0000,
+                timestamp=discord.utils.utcnow()
+            )
+            
+            embed.add_field(
+                name="👤 Usuário",
+                value=f"{user.mention} (`{user.id}`)",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="❓ Pergunta",
+                value=question[:1024],
+                inline=False
+            )
+            
+            if response:
+                if response.startswith("ERRO:"):
+                    embed.color = 0xff0000
+                    embed.add_field(
+                        name="💥 Erro",
+                        value=response[:1024],
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name="💬 Resposta",
+                        value=response[:1024] if len(response) <= 1024 else f"{response[:1020]}...",
+                        inline=False
+                    )
+            
+            await log_channel.send(embed=embed)
+            
+        except Exception as e:
+            logger.error(f"Erro ao enviar log: {str(e)}")
     
     async def call_deepseek_api(self, prompt: str) -> str:
         """Implementação real da chamada à API do DeepSeek"""
