@@ -13,21 +13,6 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 ## 🚧 Status do Projeto
 **Este projeto está em Desenvolvimento Ativo**
 
-
-### Funcionalidades concluídas:
-- [x] Configuração inicial do ambiente Python com virtualenv
-- [x] Conexão com PostgreSQL configurada
-- [x] Configuração do SQLAlchemy ORM
-- [x] Sistema básico do discord.py (comandos/eventos)
-- [x] Modelo de banco de dados para apoiadores
-- [x] Comando `/doar` com interface interativa via botão e modal
-- [x] Painel administrativo web básico
-- [x] Autenticação via Discord OAuth2
-- [x] Finalizar integração:
-  - [x] Webhook de confirmação de PIX
-  - [x] Sistema de assinaturas com cartão
-
-
 ### Integração [██████████] **100%**
 #### PIX via Pagbank:
 - [x] Configuração da API 
@@ -43,21 +28,37 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [x] Tokenização de cartões (ko-fi)
 - [x] Sistema de renovação automática (ko-fi)
 - [x] Atribuição automática de cargo
+
+### Funcionalidades concluídas:
+- [x] Configuração inicial do ambiente Python com virtualenv
+- [x] Conexão com PostgreSQL configurada
+- [x] Configuração do SQLAlchemy ORM
+- [x] Sistema básico do discord.py (comandos/eventos)
+- [x] Modelo de banco de dados para apoiadores
+- [x] Comando `/doar` com interface interativa via botão e modal
+- [x] Painel administrativo web básico
+- [x] Autenticação via Discord OAuth2
+- [x] Finalizar integração:
+  - [x] Webhook de confirmação de PIX
+  - [x] Sistema de assinaturas com cartão
+- [x] Integração completa entre webhook e cargos
+- [x] Sistema avançado de logs/alertas
+- [x] Tarefas agendadas para expiração de apoios
+- [x] Refinamento do painel administrativo
+- [x] Dashboard de métricas para apoiadores
+- [x] Sistema de notificações via webhook
+
 ### Funcionalidades em andamento:
-- [ ] Tarefas agendadas para expiração de apoios
-- [ ] Refinamento do painel administrativo
-- [ ] Integração completa entre webhook e cargos
+
+- [ ] Implementar agendamentos para:
+  - [x] Verificação de expiração
+  - [ ] Atualização de cargos automaticamente
 
 ### Funcionalidades futuras:
-- [ ] Sistema avançado de logs/alertas
 - [ ] Configuração de CI/CD
-- [ ] Dashboard de métricas para apoiadores
-- [ ] Sistema de notificações via webhook
 
 ## 🧭 Próximos Passos
-- [ ] Implementar agendamentos para:
-  - [ ] Verificação de expiração
-  - [ ] Atualização de cargos automaticamente
+
 - [ ] Adicionar painel com histórico e logs
 - [ ] Documentar API para integrações externas
 
@@ -73,7 +74,7 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [httpx](https://www.python-httpx.org/)
 - [asyncio](https://docs.python.org/3/library/asyncio.html)
-- [Render](https://render.com/) *(planejado para hospedagem do bot)*
+- [BlazeHosting](https://blazehosting.com.br/bots) *(hospedagem do bot e painel, bem recomendado)*
 
 ## 📬 Contato
 📧 **[hugmebotdev@gmail.com](mailto:hugmebotdev@gmail.com)**
@@ -82,5 +83,6 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 > Projeto pessoal desenvolvido com fins de aprendizado e apoio à comunidade autista. 💙
 ---
 ## 🧱 Arquitetura do Projeto
-![Diagrama de arquitetura](https://www.plantuml.com/plantuml/dsvg/TP9DxjCm4CNtSufHzrtm_-Y21Ug705Li0gY8xSYPf5PZJpLss20EWrXm0axGYs47Hqa3B29DNdupUVFiROYaiNST6WfISny4EcuYHa6rxJbYRPLDjE8XNAo_af939rxCMSKnHkqPW4mKnLFeRz_LIddTrSvw6w9IBLgqrSSai2EigDsJlwoGmbWlaNUoRcm6KlN60cGVvDkESIyHlm9Y7zXGO5mTlJMM56kXsy_R3ncwJeSNS-PrCDATMLzYTVoCqa_p4_am9z-oakBx3tYGcZDTeCSvLAaO3Y61Lsh9iOzoD_5f3dzYjOqrVpjyNloN_MoFNnmAje5l06Eyk5w_oiijXGT8JwaVSLXpfZmbPV07-MlMIkn9trL7o4HMSzP5Ai1iPCa4CZJDJPflhBe_cm7S7Np1dl-fRW2yH2vNJPhH4o2E-KxnXc4ZzZNcdcLdjlIVDcKZggdca8Wlbj2GncHr6hPDLU-wtm00)
+![Diagrama de Caso de Uso](//www.plantuml.com/plantuml/dpng/TPFDRXCn4CVlVefHJo2K0qq_Q0-e8UKZGaYXLH7NgJr9hEnwLcDlE23UXOe3Jy0JvCKOiywo2ULc__tpU3x-lee99RLrPIfQ94WCufUh1CuBsUGvcBZseK716ceER5V2DK6Iben1crZWBhRR1_5SjXDN--1Z4dGiHJkwLO5gXFSyMlWZmAYhDtvtEfdFu9gekILQvyD-OqpE0iEo8dZ52RuQW3QInKXmD0lUUXHmZDkVsn-SRyBTzFcGUHqjLokIIvZFFWEtVGAPF1wIRqbGuECDJDbHfWiq7a9pOKinAjZW4ciAYVSYdWpXJoH-uUs_6PuUl4jXKCSlYWKx6s9J3XkI_BBb6cOJUFAkNNuWRShJWfyFyKaIVzzwfL6M707Rn3KcpIOdJUNAYxtQq0Ug0Fln9RzX-4Bt1RumtupPpHf6evUvruV2yQ5mRbGiwp7y6SD0EO7BhdychxEMRQ6YEiBevIprPYXo9WRNjJ4BBtNNODEpvNK5RYWs71CQi-VCGfm-gfuzgbwOFatjdOQ-BdC5Mv9mgCHuGCnxcsoA6nmRFUeAyz6oE2rAoJAnRc3614vKlY8lkiy2iBFVN_T54D8OeckAIcmyvWWf9_Ki3s_5lEwcltr8thAXu207FtoY_t80EI57O3lBbH8R5DIps3OiYM3xFHkn3TwXe_y5BHOhdt-OXiOlrjJp71eSvqvJp2Labm0LP_InhtJLrjLl)
 > por algum motivo o diagrama não quer atualizar, ignore
+![Fluxo Geral](//www.plantuml.com/plantuml/dpng/ZLJFRZir4BxlKmova1n2xr5LDMrQgQ8L9LKBDpIn9wdfshFOtb1ucue3we4ZJx0lXhtnxhB4vTT3bFNucp_VvvavTnwjhtLPLE5V2LMXyV3ewkRDAXuPBzYFpsW4hr2o6vadFz06bb8hCm5q44xZw-Nz3QoK4snb2qZVmNoC-vRdMnLHuUjQPI4hekg1w2MY-aDHV0tNPVtA80bMZCsVpHyCUuLmV_DZqR63-LaajO0JoMYBy1ajtUq2xjXvYo3OR9NLASXqTNUP35wnULBqw-muOWS1cP9tqGVH5h2cdMepX9znANuiiCNcIlb-7I9B0dA-UGiwyCT4M-bW6kH_PdwP5Kd0M4EmBI1T1BynmI9SV5Xen-OGlOT6nWzSAg4y0dghDhLgSMrqjBkU_l3O2rWUW0S0OEqvIYfGa_6Kq-iEhS045wmvfMh-acCTWlXxiadGY8IRPURHD-pXD2Hpk2DzbXBsBRI0AnDrh2phoXUT6UQT_veyMuDWoLNiF6OefX0T0a8oeTYWaGnrgYT7z9Pt815KqC6sBCRydiYghHBOItmP9Samt2UWFMWsTHwtMs1J_ZRBLTl5XOgiLiurVvC3Z9DS332O7_Lu2paUdqkh48B8gSZzlwlEJ4pPPaQBFTActiaer9VgILSCXi6HtIl9zekTDaZPBwfH8oy5EOTmabXzJgPF2pIcyTt6D-yQTFFkROZeW00hLk7IaZiuTFEw9YF9gjzJj6-UlIx_q_KwDfQ3Y-RDAS4kqn3YcSHBPhrCegbTAh4xbA6l9aN67N-k9NwydKXlIBRp9b8jumAZ7BiwTNI_owRj4ymowHpvdtwn8e9EQrkUvHHS-XhBgChZ-XPa7pLJP7gDOMemkHuFsDLhfReobt4ljSiM_xSHuxkn0ugkyGgcmdAWDO27nhXLpYD86j2vFbkJvdtQd-uOcbN1-S3A7SP86VHgpyKv6LdhyXy0)
