@@ -27,6 +27,7 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
   - [x] Webhook de confirmação de PIX
   - [x] Sistema de assinaturas com cartão
 
+
 ### Integração [██████████] **100%**
 #### PIX via Pagbank:
 - [x] Configuração da API 
