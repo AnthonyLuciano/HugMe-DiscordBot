@@ -8,6 +8,7 @@ from bot.commands.verificarcargo import setup as verificarcargo_setup
 from bot.commands.sendmsg import setup as sendmsg_setup
 from bot.commands.admin import setup as admin_setup
 from bot.commands.deepseekchat import setup as deepseekchat_setup
+from bot.commands.rpg_system import setup as rpg_system_setup
 
 async def setup_all(bot):
     await tempo_setup(bot)
@@ -17,4 +18,5 @@ async def setup_all(bot):
     await sendmsg_setup(bot)
     await admin_setup(bot)
     await deepseekchat_setup(bot)
+    await rpg_system_setup(bot)
     # Adicione outros comandos aqui

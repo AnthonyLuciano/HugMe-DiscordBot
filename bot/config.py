@@ -16,8 +16,10 @@ class Config:
     DEEP_KEY = getenv('DEEP_KEY')
     
     #Discord
+    QUARTO_DO_HUGME = getenv('QUARTO_DO_HUGME')
     APOIADOR_ID = getenv('APOIADOR_CARGO_ID')
     APOIADOR_ID2 = getenv('APOIADOR_CARGO_ID2')
+    TEST_SERVER_ID = int(getenv('TEST_SERVER_ID', 0))
 
     # Webhook and security settings
     WEBHOOK_SECRET = getenv('WEBHOOK_SECRET')

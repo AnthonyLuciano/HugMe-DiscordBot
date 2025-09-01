@@ -1,0 +1,48 @@
+{
+  "401728217129418752": {
+    "history": [],
+    "character": {},
+    "current_story": "",
+    "created_at": "2025-09-01T12:05:21.177519+00:00",
+    "has_seen_tutorial": true,
+    "adventure_started_at": null
+  },
+  "401728217129418752": {
+    "history": [
+      {
+        "role": "system",
+        "content": "\nVocê é um mestre de RPG de texto. Crie uma aventura para medic, humano mago com atributos {'for': 2, 'des': 4, 'con': 7, 'int': 10, 'sab': 7, 'car': 4}.\nDê 2-3 opções de ação no final. Máximo 3 parágrafos.\n"
+      },
+      {
+        "role": "assistant",
+        "content": "A lua prateada ilumina as ruas de pedra de Arcanum, onde você, Medic, caminha com seu manto esvoaçante. Seus sentidos aguçados captam um sussurro mágico vindo das sombras de um beco próximo - uma energia arcana distorcida, como um feitiço de transmutação mal executado. Ao se aproximar, você vê três figuras encapuzadas rodeando um jovem aprendiz que segura um pergaminho brilhante. O ar cheira a ozônio e medo, e você percebe que uma das figuras está canalizando uma magia perigosa de desintegração.\n\nSua mente analítica calcula rapidamente as possibilidades: o aprendiz parece estar protegendo algo valioso, enquanto os agressores demonstram proficiência em magia de combate, porém com pouca elegância em seus gestos. O pergaminho emite uma aura de transmutação superior, possivelmente contendo segredos alquímicos raros. Você nota que a magia de desintegração está instável - o conjurador parece inexperiente, criando uma abertura para interferência mágica.\n\n**O que você faz?**\n1) Lançar uma contra-magia para neutralizar o feitiço de desintegração, usando seu intelecto superior para sobrepujar o conjurador\n2) Criar uma ilusão arcana para distrair os agressores e resgatar silenciosamente o aprendiz\n3) Aproveitar sua constituição robusta para avançar e negociar, oferecendo seus conhecimentos em troca do segurança do jovem"
+      },
+      {
+        "role": "user",
+        "content": "eu uso uma contra-magia"
+      },
+      {
+        "role": "assistant",
+        "content": "Você ergue seu cajado, os olhos brilhando com energia arcana enquanto palavras de poder antigo rolam de sua língua. Sua mente aguçada (INT 10) desvenda instantaneamente as falhas na tecelagem mágica do agressor - a desintegração é poderosa, mas grosseira. Com um gesto preciso, você lança um contra-feitiço que desfaz as amarras mágicas como um sopro dissipando fumaça. O feitiço de desintegração colapsa com um estalo seco, e o conjurador recua com um grunhido de surpresa e dor.\n\nOs três agressores agora se voltam para você, suas capas se abrindo para revelar vestes de mercenários arcano. O aprendiz aproveita a distração para rolar para trás de uma pilha de barris, ainda agarrando o pergaminho. O líder do grupo sibila: \"Um mago interferindo em assuntos alquímicos? Você não sabe com quem está se metendo!\" Suas mãos começam a brilhar com nova energia, mas você percebe que eles estão se reposicionando para um ataque coordenado.\n\n**O que você faz agora?**\n1) Lançar uma barreira arcana defensiva para proteger a si mesmo e ao aprendiz\n2) Invocar uma névoa obscuracente para cobrir sua retirada estratégica\n3) Usar seu conhecimento para identificar a origem das vestes dos mercenários e negociar"
+      }
+    ],
+    "character": {
+      "name": "medic",
+      "class": "mago",
+      "race": "humano",
+      "attributes": {
+        "for": 2,
+        "des": 4,
+        "con": 7,
+        "int": 10,
+        "sab": 7,
+        "car": 4
+      },
+      "created_at": "2025-09-01T12:27:50.040763+00:00"
+    },
+    "current_story": "",
+    "created_at": "2025-09-01T12:26:56.957911+00:00",
+    "has_seen_tutorial": true,
+    "adventure_started_at": "2025-09-01T12:28:06.595257+00:00"
+  }
+}
