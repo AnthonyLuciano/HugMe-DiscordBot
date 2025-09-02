@@ -63,8 +63,8 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [ ] Documentar API para integrações externas
 
 ## 🏁 Etapa Final
-- [ ] Testes completos no ambiente real
-- [ ] Migrar o bot para ambiente de produção
+- [x] Testes completos no ambiente real
+- [x] Migrar o bot para ambiente de produção
 
 ## 🛠 Tecnologias Utilizadas
 - [Python 3.12+](https://www.python.org/)
