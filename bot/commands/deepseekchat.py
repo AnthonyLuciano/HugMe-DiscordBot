@@ -2,6 +2,7 @@ import discord, os, logging
 from os import getenv
 from discord.ext import commands
 import requests
+from collections import deque
 logger = logging.getLogger(__name__)
 
 class DeepseekCommands(commands.Cog):
@@ -12,6 +13,7 @@ class DeepseekCommands(commands.Cog):
         self.allowed_channel_id=int(getenv("QUARTO_DO_HUGME", 0))
         if not self.api_key:
             raise ValueError("DEEP_KEY must be set in environment variables")
+        self.message_history = {}
         
     @commands.hybrid_command(name="bot", description="converse com o Hugme!")
     async def conversar(self, ctx: commands.Context, *, mensagem:str):
@@ -20,8 +22,23 @@ class DeepseekCommands(commands.Cog):
             return
         
         try:
-            response = await self.call_deepseek_api(mensagem)
+            channel_id = ctx.channel.id
+            if channel_id not in self.message_history:
+                self.message_history[channel_id] = deque(maxlen=10)
+            
+            history = list(self.message_history[channel_id])
+                
+            response = await self.call_deepseek_api(mensagem, history)
             await ctx.channel.send(f"{ctx.author.mention}{response}")
+            
+            self.message_history[channel_id].append({
+                "role": "user",
+                "content": mensagem
+            })
+            self.message_history[channel_id].append({
+                "role": "assistant",
+                "content": response
+            })
             
             await self.log_interaction(ctx.author, mensagem, response)
             
@@ -77,7 +94,7 @@ class DeepseekCommands(commands.Cog):
         except Exception as e:
             logger.error(f"Erro ao enviar log: {str(e)}")
     
-    async def call_deepseek_api(self, prompt: str) -> str:
+    async def call_deepseek_api(self, prompt: str, history: list) -> str:
         """Implementação real da chamada à API do DeepSeek"""
         # Substitua por sua chave de API real
         headers = {
@@ -100,13 +117,13 @@ class DeepseekCommands(commands.Cog):
 
         Exemplos de interação:
         Usuário: "Oi HugMe, tudo bem?"
-        HugMe: "E aí! Tô de boa 😎 e você, como tá?"
+        HugMe: "Claro colega, o que precisa de mim? :^"
 
         Usuário: "Tô com dificuldade pra focar."
-        HugMe: "Putz, sei como é. Já tentou quebrar a tarefa em pedacinhos menores? Facilita bastante."
+        HugMe: "vish, que tal quebrar suas tarefas igual quests em um jogo? depois se recompense com um doçe ou algo assim :v"
 
         Usuário: "Tô sem ideia de projeto."
-        HugMe: "Clássico bloqueio criativo 😂 às vezes uma pausa ou mudar de ambiente já ajuda. Quer que eu te jogue umas ideias aleatórias?"
+        HugMe: "quem nunca, tenta pegar inspiração de algo, ou criar um problema ficticio pra resolver, quem sabe ate um problema pequeno real? :p."
 
         Usuário: "Me sinto meio bagunçado."
         HugMe: "Relaxa, todo mundo passa por isso. Já tentou fazer uma listinha rápida do que precisa fazer hoje? Ajuda a clarear a mente."
@@ -115,16 +132,24 @@ class DeepseekCommands(commands.Cog):
 
         """
         
+        messages = [{
+            "role": "system",
+            "content": descricao_hugme
+        }]
+        
+        # Add message history if available
+        for message in history:
+            messages.append(message)
+        
+        # Add current user message
+        messages.append({
+            "role": "user",
+            "content": prompt
+        })
+
         data = {
             "model": "deepseek-chat",
-            "messages": [{
-                "role": "system",
-                "content": descricao_hugme
-            },
-            {
-                "role": "user",
-                "content": f"{prompt}"
-            }]
+            "messages": messages
         }
 
         response = requests.post(
