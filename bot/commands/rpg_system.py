@@ -1,7 +1,10 @@
-import discord, os, logging, json, asyncio, aiohttp
+from datetime import datetime
+import discord,logging,aiohttp
 from discord.ext import commands
 from typing import Dict
-from datetime import datetime
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy import select
+from bot.database.models import RPGSession, RPGCharacter, Base
 from bot.config import Config as app_config
 
 logger = logging.getLogger(__name__)
@@ -12,57 +15,77 @@ class SistemaRPG(commands.Cog):
         self.api_key = app_config.DEEP_KEY
         self.log_channel_id = int(app_config.DONO_LOG_CHANNEL) if app_config.DONO_LOG_CHANNEL else None
         self.allowed_channel_id = int(app_config.QUARTO_DO_HUGME) if app_config.QUARTO_DO_HUGME else None
-        self.sessions_file = "data/rpg_sessions.json"
-        self.user_sessions: Dict[int, Dict] = {}
-        self.save_lock = asyncio.Lock()
-
+        
+        # Configuração do banco de dados
+        self.engine = create_async_engine(app_config.DATABASE_URL)
+        self.async_session = async_sessionmaker(
+            self.engine, expire_on_commit=False, class_=AsyncSession
+        )
+        
         if not self.api_key:
             raise ValueError("DEEP_KEY precisa estar configurada no environment variables")
 
-        self.carregar_sessoes()
-
     # ---------------- SESSÕES ----------------
-    def carregar_sessoes(self):
-        try:
-            if os.path.exists(self.sessions_file):
-                with open(self.sessions_file, 'r', encoding='utf-8') as f:
-                    self.user_sessions = json.load(f)
-        except Exception as e:
-            logger.error(f"Erro ao carregar sessões: {str(e)}")
-            self.user_sessions = {}
-
-    async def salvar_sessoes(self):
-        async with self.save_lock:
-            try:
-                os.makedirs(os.path.dirname(self.sessions_file), exist_ok=True)
-                with open(self.sessions_file, 'w', encoding='utf-8') as f:
-                    json.dump(self.user_sessions, f, ensure_ascii=False, indent=2)
-            except Exception as e:
-                logger.error(f"Erro ao salvar sessões: {str(e)}")
-
-    def pegar_sessao_usuario(self, user_id: int) -> Dict:
-        if user_id not in self.user_sessions:
-            self.user_sessions[user_id] = {
-                "history": [],
-                "character": {},
-                "current_story": "",
-                "created_at": discord.utils.utcnow().isoformat(),
-                "has_seen_tutorial": False,
-                "adventure_started_at": None
-            }
-        return self.user_sessions[user_id]
+    async def pegar_sessao_usuario(self, user_id: int) -> Dict:
+        """Busca ou cria sessão do usuário no banco de dados"""
+        async with self.async_session() as session:
+            result = await session.execute(
+                select(RPGSession).where(RPGSession.user_id == str(user_id))
+                )
+            db_session = result.scalar_one_or_none()
+            
+            if not db_session:
+                # Cria nova sessão
+                db_session = RPGSession(
+                    user_id=str(user_id),
+                    history=[],
+                    character_data={},
+                    current_story="",
+                    has_seen_tutorial=False,
+                    adventure_started_at=None
+                )
+                session.add(db_session)
+                await session.commit()
+                await session.refresh(db_session)
+            
+            return self._db_session_to_dict(db_session)
+    
+    def _db_session_to_dict(self, db_session: RPGSession) -> Dict:
+        """Converte objeto SQLAlchemy para dicionário"""
+        return {
+            "history": db_session.history,
+            "character": db_session.character_data,
+            "current_story": db_session.current_story,
+            "created_at": db_session.created_at,
+            "has_seen_tutorial": db_session.has_seen_tutorial,
+            "adventure_started_at": db_session.adventure_started_at if db_session.adventure_started_at else None
+        }
+    
+    async def atualizar_sessao_usuario(self, user_id: int, data: Dict):
+        """Atualiza sessão do usuário no banco de dados"""
+        async with self.async_session() as session:
+            result = await session.execute(
+                select(RPGSession).where(RPGSession.user_id == str(user_id))
+                )
+            db_session = result.scalar_one_or_none()
+            
+            if db_session:
+                db_session.history = data.get("history", [])
+                character_data = data.get("character", {})
+                if character_data and 'created_at' in character_data and isinstance(character_data['created_at'], datetime):
+                    character_data['created_at'] = character_data['created_at'].isoformat()
+                db_session.character_data = character_data
+                db_session.current_story = data.get("current_story", "")
+                db_session.has_seen_tutorial = data.get("has_seen_tutorial", False)
+                db_session.adventure_started_at = data.get("adventure_started_at")
+                db_session.updated_at = discord.utils.utcnow()
+                
+                await session.commit()
 
     # ---------------- COMANDO RPG ----------------
     @commands.hybrid_command(name="rpg", description="Inicia ou continua sua aventura de RPG!")
     async def rpg(self, ctx: commands.Context, *, acao: str = ""):
         await ctx.defer(ephemeral=False)
-
-        if ctx.guild.id != app_config.TEST_SERVER_ID:
-            if ctx.interaction:
-                await ctx.send("❌ Este comando só pode ser usado no servidor de testes.", ephemeral=True)
-            else:
-                await ctx.send("❌ Este comando só pode ser usado no servidor de testes.", delete_after=10)
-            return
 
         if self.allowed_channel_id and ctx.channel.id != self.allowed_channel_id:
             if ctx.interaction:
@@ -72,7 +95,7 @@ class SistemaRPG(commands.Cog):
             return
 
         try:
-            sessao = self.pegar_sessao_usuario(ctx.author.id)
+            sessao = await self.pegar_sessao_usuario(ctx.author.id)
 
             if not sessao["has_seen_tutorial"]:
                 await self.mostrar_tutorial(ctx, sessao)
@@ -89,8 +112,6 @@ class SistemaRPG(commands.Cog):
             else:
                 await ctx.send("❌ Você precisa especificar uma ação! Use `/rpg iniciar` ou `/rpg [ação]`.")
 
-            await self.salvar_sessoes()
-
         except Exception as e:
             logger.error(f"Erro no comando rpg: {e}")
             try:
@@ -105,13 +126,13 @@ class SistemaRPG(commands.Cog):
 
 **Como jogar:**
 • Use `/rpg iniciar` para começar uma nova aventura
-• Use `/rpg_personagem` para criar seu personagem
+• Use `/rpg_personagem` para criar seu personagem, atributos devem ser entre 1 e 10
 • Use `/rpg [sua ação]` para interagir com o mundo
 • Use `/rpg_status` para ver seu progresso
 """
         await ctx.send(tutorial)
         sessao["has_seen_tutorial"] = True
-        await self.salvar_sessoes()
+        await self.atualizar_sessao_usuario(ctx.author.id, sessao)
 
     # ---------------- COMANDO RPG_PERSONAGEM ----------------
     @commands.hybrid_command(
@@ -135,7 +156,7 @@ class SistemaRPG(commands.Cog):
         await ctx.defer(ephemeral=False)
 
         try:
-            sessao = self.pegar_sessao_usuario(ctx.author.id)
+            sessao = await self.pegar_sessao_usuario(ctx.author.id)
             
             if sessao.get("character"):
                 await ctx.send("❌ Você já tem um personagem criado! Use `/rpg iniciar`.")
@@ -155,14 +176,26 @@ class SistemaRPG(commands.Cog):
                 if valor < 1 or valor > 10:
                     await ctx.send(f"❌ O atributo {nome_attr} deve estar entre 1 e 10.")
                     return
-                
-            sessao = self.pegar_sessao_usuario(ctx.author.id)
-            
-            if sessao.get("character"):
-                await ctx.send("❌ Você já tem um personagem criado! Use `/rpg iniciar`.")
-                return
 
-            # Criar personagem
+            # Criar personagem no banco de dados
+            async with self.async_session() as session:
+                character = RPGCharacter(
+                    user_id=str(ctx.author.id),
+                    name=nome,
+                    class_name=classe,
+                    race=raca,
+                    strength=forca,
+                    dexterity=destreza,
+                    constitution=constituicao,
+                    intelligence=inteligencia,
+                    wisdom=sabedoria,
+                    charisma=carisma
+                )
+                session.add(character)
+                await session.commit()
+                await session.refresh(character)
+
+            # Atualizar sessão
             sessao["character"] = {
                 "name": nome,
                 "class": classe,
@@ -170,6 +203,7 @@ class SistemaRPG(commands.Cog):
                 "attributes": atributos,
                 "created_at": discord.utils.utcnow().isoformat()
             }
+            await self.atualizar_sessao_usuario(ctx.author.id, sessao)
 
             await ctx.send(
                 f"🎉 Personagem **{nome}** criado com sucesso!\n"
@@ -180,7 +214,6 @@ class SistemaRPG(commands.Cog):
                 f"• Inteligência: {inteligencia}\n• Sabedoria: {sabedoria}\n• Carisma: {carisma}\n\n"
                 f"Use `/rpg iniciar` para começar sua aventura!"
             )
-            await self.salvar_sessoes()
 
         except Exception as e:
             logger.error(f"Erro no comando rpg_personagem: {e}")
@@ -192,7 +225,7 @@ class SistemaRPG(commands.Cog):
         """Mostra o status da aventura atual"""
         await ctx.defer(ephemeral=False)
         
-        sessao = self.pegar_sessao_usuario(ctx.author.id)
+        sessao = await self.pegar_sessao_usuario(ctx.author.id)
         
         if not sessao["history"]:
             await ctx.send("❌ Você ainda não iniciou uma aventura! Use `/rpg iniciar`")
@@ -216,7 +249,7 @@ class SistemaRPG(commands.Cog):
         
         embed.add_field(
             name="📅 Iniciada em",
-            value=data_inicio[:10],
+            value=data_inicio.strftime("%Y-%m-%d") if data_inicio else "Não iniciada",
             inline=True
         )
         
@@ -244,21 +277,24 @@ class SistemaRPG(commands.Cog):
             return
 
         sessao["history"] = []
-        sessao["adventure_started_at"] = discord.utils.utcnow().isoformat()
+        sessao["adventure_started_at"] = discord.utils.utcnow()
 
         char = sessao["character"]
         prompt_inicial = f"""
-Você é um mestre de RPG de texto. Crie uma aventura para {char['name']}, {char['race']} {char['class']} com atributos {char['attributes']}.
-Dê 2-3 opções de ação no final. Máximo 3 parágrafos.
+Você é um mestre de RPG de texto. Crie uma aventura épica e imersiva para {char['name']}, um {char['race']} {char['class']} com os seguintes atributos: {char['attributes']}.
+Descreva o cenário, NPCs e conflitos de forma vívida, usando detalhes sensoriais e emoção. Inclua elementos de surpresa e desafios que incentivem decisões estratégicas.
+No final, apresente 2 a 3 opções de ação concretas para o jogador escolher, **e uma quarta opção indicando que ele pode fazer algo diferente, sugerindo sua própria ação**. 
+A resposta deve ter no máximo 3 parágrafos e ser coerente com a personalidade e habilidades do personagem.
 """
+
         resposta = await self.chamar_api_rpg(prompt_inicial, sessao["history"])
         sessao["history"].extend([
             {"role": "system", "content": prompt_inicial},
             {"role": "assistant", "content": resposta}
         ])
 
+        await self.atualizar_sessao_usuario(ctx.author.id, sessao)
         await ctx.send(f"🎮 **Aventura iniciada com {char['name']}!**\n\n{resposta}")
-        await self.salvar_sessoes()
 
     async def continuar_historia(self, ctx: commands.Context, sessao: Dict, acao_jogador: str):
         if not sessao["history"]:
@@ -271,8 +307,8 @@ Dê 2-3 opções de ação no final. Máximo 3 parágrafos.
         resposta = await self.chamar_api_rpg("Continue a história com base na ação do jogador:", contexto)
         sessao["history"].append({"role": "assistant", "content": resposta})
 
+        await self.atualizar_sessao_usuario(ctx.author.id, sessao)
         await ctx.send(f"🎭 **Continuação da aventura**\n\n{resposta}")
-        await self.salvar_sessoes()
 
     # ---------------- API ----------------
     async def chamar_api_rpg(self, prompt: str, history: list) -> str:
@@ -298,6 +334,10 @@ Dê 2-3 opções de ação no final. Máximo 3 parágrafos.
             logger.error(f"Erro na API: {str(e)}")
             return "⚠️ O mestre não está respondendo. Tente novamente mais tarde."
 
+    # ---------------- COG CLEANUP ----------------
+    async def cog_unload(self):
+        """Fecha a conexão com o banco de dados quando o cog é descarregado"""
+        await self.engine.dispose()
 
 # ---------------- SETUP ----------------
 async def setup(bot: commands.Bot):

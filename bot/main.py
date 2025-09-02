@@ -1,10 +1,12 @@
 import discord, os, logging, httpx, time, threading, uvicorn
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import create_async_engine
 from discord.ext import commands
 from dotenv import load_dotenv
 from bot.database import Base, engine
 from bot.database.models import Apoiador, Base, PixConfig
 from bot.shared import set_bot_instance
+from bot.config import config as app_config
 
 # Configuração básica de logging
 logging.basicConfig(
@@ -32,6 +34,7 @@ class HugMeBot(commands.Bot):
         intents.members = True
         self.db = DatabaseManager()
         self.web_thread = None
+        self.config = app_config
         super().__init__(
             command_prefix='!',  # Mantém prefixo para comandos tradicionais
             intents=discord.Intents.all(),
@@ -40,7 +43,6 @@ class HugMeBot(commands.Bot):
             activity=discord.Game(name="Ajudando a comunidade")
         )
         self.db = DatabaseManager()
-        self._init_db()
         
     def start_web_server(self):
         """Inicia o servidor web em uma thread separada"""
@@ -51,10 +53,19 @@ class HugMeBot(commands.Bot):
         self.web_thread.start()
         logger.info("Servidor web iniciado na porta 26173")
 
-    def _init_db(self):
-        """Cria apenas as tabelas necessárias"""
-        Base.metadata.create_all(bind=engine)
-
+    async def _init_db(self):
+        """Inicialização assíncrona do banco de dados"""
+        try:
+            # Use create_async_engine para operações async
+            async_engine = create_async_engine(self.config.DATABASE_URL)
+            async with async_engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            await async_engine.dispose()
+            logger.info("✅ Banco de dados inicializado com sucesso")
+        except Exception as e:
+            logger.error(f"❌ Erro ao inicializar banco de dados: {e}")
+            raise
+        
     async def on_member_join(self, member):
         """Apenas loga, sem verificação no banco"""
         logger.info(f"Novo membro: {member.display_name}")
@@ -66,6 +77,8 @@ class HugMeBot(commands.Bot):
             for filename in os.listdir('./bot/commands'):
                 if filename.endswith('.py') and not filename.startswith('_'):
                     try:
+                        await self._init_db()  # Inicializa o DB antes de carregar cogs
+                        logger.info(f"Banco de dados incializado antes dos cogs")
                         await self.load_extension(f'bot.commands.{filename[:-3]}')
                         logger.info(f"Extensão '{filename}' carregada com sucesso")
                     except Exception as e:
