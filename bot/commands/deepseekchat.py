@@ -3,7 +3,7 @@ from os import getenv
 from discord.ext import commands
 import requests
 from collections import deque
-from bot.commands.admin import is_owner
+
 logger = logging.getLogger(__name__)
 
 class DeepseekCommands(commands.Cog):
@@ -81,7 +81,6 @@ class DeepseekCommands(commands.Cog):
             await ctx.send("Erro de memoria cheia ou posivelmente API esta fora de serviço, avise ao desenvolvedor.", ephemeral=True)
             await self.log_interaction(ctx.author, mensagem, f"ERRO: {str(e)}")
 
-    @is_owner()
     @commands.hybrid_command(name="toggle_auto", description="Ativa/desativa respostas automáticas")
     @commands.has_permissions(administrator=True)
     async def toggle_auto_response(self, ctx):
