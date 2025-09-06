@@ -3,7 +3,7 @@ import os
 import logging
 import threading
 import uvicorn
-from dotenv import load_dotenv
+from bot.config import Config as app_config
 from discord.ext import commands
 from bot.database import Base
 from bot.database.models import Apoiador
@@ -19,9 +19,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Carrega variáveis do arquivo .env
-load_dotenv()
 
-DATABASE_URL = os.getenv('DATABASE_URL')
+
+DATABASE_URL = app_config.DATABASE_URL
 # Engine async
 engine = create_async_engine(DATABASE_URL, echo=True, future=True)
 AsyncSessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
