@@ -13,49 +13,53 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 ## 🚧 Status do Projeto
 **Este projeto está em Desenvolvimento Ativo**
 
-### Integração [██████████] **100%**
-#### PIX via Pagbank:
-- [x] Configuração da API 
-- [x] Geração de QR Code dinâmico
-- [x] Sistema básico de webhooks
-- [x] Validação completa de pagamento via webhook
-  - [x] Envio do Webhook pro PagBank
-  - [x] Recebimento de Confirmação 
-- [x] Atribuição automática de cargo
-### Integração [██████████] **100%**
-#### Cartão de Crédito:
-- [x] Implementação de assinaturas recorrentes (ko-fi)
-- [x] Tokenização de cartões (ko-fi)
-- [x] Sistema de renovação automática (ko-fi)
-- [x] Atribuição automática de cargo
+#### PIX via Pagbank: Integração [██████████] **100%**
 
-### Funcionalidades concluídas:
-- [x] Configuração inicial do ambiente Python com virtualenv
-- [x] Conexão com PostgreSQL configurada
-- [x] Configuração do SQLAlchemy ORM
-- [x] Sistema básico do discord.py (comandos/eventos)
-- [x] Modelo de banco de dados para apoiadores
-- [x] Comando `/doar` com interface interativa via botão e modal
-- [x] Painel administrativo web básico
-- [x] Autenticação via Discord OAuth2
-- [x] Finalizar integração:
-  - [x] Webhook de confirmação de PIX
-  - [x] Sistema de assinaturas com cartão
-- [x] Integração completa entre webhook e cargos
-- [x] Sistema avançado de logs/alertas
-- [x] Tarefas agendadas para expiração de apoios
-- [x] Refinamento do painel administrativo
-- [x] Dashboard de métricas para apoiadores
-- [x] Sistema de notificações via webhook
+#### Cartão de Crédito: Integração [██████████] **100%**
 
-### Funcionalidades em andamento:
+#### Funcionalidades prontas antigas:
+![Funcionalidades(old)](https://github.com/AnthonyLuciano/HugMe-DiscordBot/blob/test/oldREADME.md)
+
+### Funcionalidades Gerais em andamento:
 
 - [ ] Implementar agendamentos para:
   - [x] Verificação de expiração
   - [ ] Atualização de cargos automaticamente
 
-### Funcionalidades futuras:
-- [ ] Configuração de CI/CD
+## 🎮 Sistema de RPG por Texto
+
+### Funcionalidades Concluídas:
+- [x] **Sistema de Personagens**: Criação com 6 atributos (1-10) via `/rpg_personagem`
+- [x] **Histórico Persistente**: Sessões salvas em banco MariaDB com SQLAlchemy async
+- [x] **Comandos Híbridos**: `/rpg`, `/rpg_personagem`, `/rpg_status` (slash e prefixo)
+- [x] **Integração DeepSeek**: API para geração de aventuras com contexto histórico
+- [x] **Sistema de Tutorial**: Guia interativo para novos jogadores
+- [x] **Status Embed**: Visualização elegante do progresso da aventura
+- [x] **Gestão de Sessões**: Histórico mantém últimas 8 interações por desempenho
+
+### Funcionalidades em Andamento:
+- [ ] **Sistema de Itens**: Inventário e equipamentos para personagens
+- [ ] **Sistema de Combate**: Resolução automática de conflitos baseada em atributos
+- [ ] **Múltiplas Aventuras**: Escolha entre diferentes cenários e temas
+- [ ] **Achievements**: Conquistas e recompensas por progresso
+
+### Tecnologias Utilizadas:
+- **Database**: MariaDB com SQLAlchemy ORM async
+- **API**: DeepSeek Chat para geração de conteúdo
+- **Framework**: discord.py com comandos híbridos
+- **Armazenamento**: JSON em campos SQL para flexibilidade
+
+### Arquitetura:
+- **Modelos**: `RPGSession` (sessões), `RPGCharacter` (personagens)
+- **Engine Async**: Operações não-bloqueantes para melhor performance
+- **Cache Inteligente**: Histórico mantido em memória com persistência automática
+- **Tratamento de Erros**: Sistema robusto com fallbacks amigáveis
+
+### Exemplo de Uso:
+1. `/rpg_personagem João Mago Humano 3 5 4 10 10 5`
+2. `/rpg iniciar` - Começa uma aventura épica
+3. `/rpg Atacar o dragão com magia` - Interage com o mundo
+4. `/rpg_status` - Verifica progresso e atributos
 
 ## 🧭 Próximos Passos
 
