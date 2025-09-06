@@ -47,6 +47,14 @@ class DeepseekCommands(commands.Cog):
             error_msg = f"❌ Erro ao responder automaticamente: {str(e)}"
             await message.channel.send("Erro ao processar mensagem automática.", ephemeral=True)
             await self.log_interaction(message.author, message.content, f"ERRO AUTO: {str(e)}")
+            
+    @commands.hybrid_command(name="chatstatus", description="Checagem se o bot respondera automaticamente ou não")
+    async def statuschat(self, ctx: commands.Context):
+        if (self.auto_response):
+            await ctx.send(f"✅ Respostas automaticas ativadas", ephemeral=True)
+        else:
+            await ctx.send(f"❌ Respostas automaticas desativadas", ephemeral=True)
+            
 
         
     @commands.hybrid_command(name="bot", description="converse com o Hugme!")
