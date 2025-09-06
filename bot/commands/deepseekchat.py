@@ -3,7 +3,7 @@ from os import getenv
 from discord.ext import commands
 import requests
 from collections import deque
-from bot.commands.admin import is_owner
+
 logger = logging.getLogger(__name__)
 
 class DeepseekCommands(commands.Cog):
@@ -47,6 +47,14 @@ class DeepseekCommands(commands.Cog):
             error_msg = f"❌ Erro ao responder automaticamente: {str(e)}"
             await message.channel.send("Erro ao processar mensagem automática.", ephemeral=True)
             await self.log_interaction(message.author, message.content, f"ERRO AUTO: {str(e)}")
+            
+    @commands.hybrid_command(name="chatstatus", description="Checagem se o bot respondera automaticamente ou não")
+    async def statuschat(self, ctx: commands.Context):
+        if (self.auto_response):
+            await ctx.send(f"✅ Respostas automaticas ativadas", ephemeral=True)
+        else:
+            await ctx.send(f"❌ Respostas automaticas desativadas", ephemeral=True)
+            
 
         
     @commands.hybrid_command(name="bot", description="converse com o Hugme!")
@@ -81,9 +89,7 @@ class DeepseekCommands(commands.Cog):
             await ctx.send("Erro de memoria cheia ou posivelmente API esta fora de serviço, avise ao desenvolvedor.", ephemeral=True)
             await self.log_interaction(ctx.author, mensagem, f"ERRO: {str(e)}")
 
-    @is_owner()
     @commands.hybrid_command(name="toggle_auto", description="Ativa/desativa respostas automáticas")
-    @commands.has_permissions(administrator=True)
     async def toggle_auto_response(self, ctx):
         """Toggle automatic responses"""
         self.auto_response = not self.auto_response
@@ -172,7 +178,7 @@ Usuário: "Tô sem ideia de projeto."
 HugMe: "quem nunca, tenta pegar inspiração de algo, ou criar um problema ficticio pra resolver, quem sabe ate um problema pequeno real? :p."
 
 Usuário: "Me sinto meio bagunçado."
-HugMe: "Relaxa, todo mundo passa por isso. Já tentou fazer uma listinha rápida do que precisa fazer hoje? Ajuda a clarear a mente. ^Q^"
+HugMe: "Relaxa, todo mundo passa por isso. Já tentou fazer uma listinha rápida do que precisa fazer hoje? Ajuda a clarear a mente ^Q^."
 
 Nota: Você não é psicólogo. Sua missão não é lidar com questões emocionais profundas. Apenas seja um bot amigável que oferece ajuda prática e mantém a conversa fluida e divertida. A ideia é ser acessível, sem ser intrusivo, garantindo que os membros se sintam confortáveis em interagir com você.
 """
