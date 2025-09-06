@@ -3,6 +3,7 @@ from os import getenv
 from discord.ext import commands
 import requests
 from collections import deque
+from bot.commands.admin import is_owner
 logger = logging.getLogger(__name__)
 
 class DeepseekCommands(commands.Cog):
@@ -11,9 +12,42 @@ class DeepseekCommands(commands.Cog):
         self.api_key = getenv('DEEP_KEY')
         self.log_channel_id=int(getenv('DEEPSEEK_LOG_CHANNEL', 0))
         self.allowed_channel_id=int(getenv("QUARTO_DO_HUGME", 0))
+        self.auto_response = True #caso true, bot responde sozinho
         if not self.api_key:
             raise ValueError("DEEP_KEY must be set in environment variables")
         self.message_history = {}
+        
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if (not self.auto_response or message.author.bot or not self.allowed_channel_id or message.channel.id != self.allowed_channel_id or message.content.startswith(self.bot.command_prefix)):
+            return
+        
+        try:
+            channel_id = message.channel.id
+            if channel_id not in self.message_history:
+                self.message_history[channel_id] = deque(maxlen=10)
+            
+            history = list(self.message_history[channel_id])
+                
+            response = await self.call_deepseek_api(message.content, history)
+            await message.channel.send(f"{message.author.mention}{response}")
+            
+            self.message_history[channel_id].append({
+                "role": "user",
+                "content": message.content
+            })
+            self.message_history[channel_id].append({
+                "role": "assistant",
+                "content": response
+            })
+            
+            await self.log_interaction(message.author, message.content, response)
+            
+        except Exception as e:
+            error_msg = f"❌ Erro ao responder automaticamente: {str(e)}"
+            await message.channel.send("Erro ao processar mensagem automática.", ephemeral=True)
+            await self.log_interaction(message.author, message.content, f"ERRO AUTO: {str(e)}")
+
         
     @commands.hybrid_command(name="bot", description="converse com o Hugme!")
     async def conversar(self, ctx: commands.Context, *, mensagem:str):
@@ -46,6 +80,16 @@ class DeepseekCommands(commands.Cog):
             error_msg = f"❌ Erro ao chamar a API Deepseek: {str(e)}"
             await ctx.send("Erro de memoria cheia ou posivelmente API esta fora de serviço, avise ao desenvolvedor.", ephemeral=True)
             await self.log_interaction(ctx.author, mensagem, f"ERRO: {str(e)}")
+
+    @is_owner()
+    @commands.hybrid_command(name="toggle_auto", description="Ativa/desativa respostas automáticas")
+    @commands.has_permissions(administrator=True)
+    async def toggle_auto_response(self, ctx):
+        """Toggle automatic responses"""
+        self.auto_response = not self.auto_response
+        status = "✅ **LIGADO**" if self.auto_response else "❌ **DESLIGADO**"
+        await ctx.send(f"Respostas automáticas: {status}", ephemeral=True)
+
 
     async def log_interaction(self, user: discord.User, question: str, response: str | None):
         if not self.log_channel_id:
