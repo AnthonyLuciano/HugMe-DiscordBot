@@ -90,7 +90,6 @@ class DeepseekCommands(commands.Cog):
             await self.log_interaction(ctx.author, mensagem, f"ERRO: {str(e)}")
 
     @commands.hybrid_command(name="toggle_auto", description="Ativa/desativa respostas automáticas")
-    @commands.has_permissions(administrator=True)
     async def toggle_auto_response(self, ctx):
         """Toggle automatic responses"""
         self.auto_response = not self.auto_response
