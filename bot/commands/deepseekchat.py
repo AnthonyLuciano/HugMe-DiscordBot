@@ -210,7 +210,11 @@ Nota: Você não é psicólogo. Sua missão não é lidar com questões emociona
             headers=headers
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        
+        raw_response = response.json()["choices"][0]["message"]["content"]
+        filtered_response = raw_response.replace("@everyone", "everyone").replace("@here", "here")
+        
+        return filtered_response
 
 async def setup(bot):
     await bot.add_cog(DeepseekCommands(bot))
