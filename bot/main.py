@@ -56,7 +56,8 @@ class HugMeBot(commands.Bot):
             intents=intents,
             application_id=os.getenv('APPLICATION_ID'),
             help_command=None,
-            activity=discord.Game(name="Ajudando a comunidade")
+            activity=discord.Game(name="Ajudando a comunidade"),
+            allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True)
         )
         self.db = DatabaseManager()
         self.web_thread = None
