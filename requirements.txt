@@ -14,3 +14,4 @@ itsdangerous
 apscheduler
 psycopg2
 pymysql
+aiomysql

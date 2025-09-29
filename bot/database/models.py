@@ -1,5 +1,5 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Integer, DateTime, Boolean
+from sqlalchemy import String, Integer, DateTime, Boolean, JSON, Text
 from datetime import datetime, timezone
 
 class Base(DeclarativeBase):
@@ -44,6 +44,49 @@ class Apoiador(Base):
 
     def __repr__(self) -> str:
         return f"<Apoiador(discord_id={self.discord_id}, nivel={self.nivel})>"
+    
+class RPGCharacter(Base):
+    __tablename__ = 'rpg_characters'
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    class_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    race: Mapped[str] = mapped_column(String(50), nullable=False)
+    strength: Mapped[int] = mapped_column(Integer)
+    dexterity: Mapped[int] = mapped_column(Integer)
+    constitution: Mapped[int] = mapped_column(Integer)
+    intelligence: Mapped[int] = mapped_column(Integer)
+    wisdom: Mapped[int] = mapped_column(Integer)
+    charisma: Mapped[int] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+class RPGSession(Base):
+    __tablename__ = 'rpg_sessions'
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    character_data: Mapped[dict] = mapped_column(JSON, default=dict)
+    current_story: Mapped[str] = mapped_column(Text, default="")
+    has_seen_tutorial: Mapped[bool] = mapped_column(Boolean, default=False)
+    adventure_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    summary_count: Mapped[int] = mapped_column(Integer, default=0)
+    active_character_id: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )    
 
 class GuildConfig(Base):
     __tablename__ = 'guild_configs'
