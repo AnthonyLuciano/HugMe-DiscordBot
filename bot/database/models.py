@@ -59,6 +59,7 @@ class RPGCharacter(Base):
     intelligence: Mapped[int] = mapped_column(Integer)
     wisdom: Mapped[int] = mapped_column(Integer)
     charisma: Mapped[int] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -77,6 +78,8 @@ class RPGSession(Base):
     current_story: Mapped[str] = mapped_column(Text, default="")
     has_seen_tutorial: Mapped[bool] = mapped_column(Boolean, default=False)
     adventure_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    summary_count: Mapped[int] = mapped_column(Integer, default=0)
+    active_character_id: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

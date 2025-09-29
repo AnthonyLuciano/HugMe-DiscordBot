@@ -29,19 +29,24 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 ## 🎮 Sistema de RPG por Texto
 
 ### Funcionalidades Concluídas:
-- [x] **Sistema de Personagens**: Criação com 6 atributos (1-10) via `/rpg_personagem`
+- [x] **Sistema de Personagens**: Criação com 6 atributos (1-20) via `/rpg_personagem`
+- [x] **Múltiplos Personagens**: Até 3 personagens por usuário com gerenciamento completo
 - [x] **Histórico Persistente**: Sessões salvas em banco MariaDB com SQLAlchemy async
-- [x] **Comandos Híbridos**: `/rpg`, `/rpg_personagem`, `/rpg_status` (slash e prefixo)
+- [x] **Comandos Híbridos**: `/rpg`, `/rpg_personagem`, `/rpg_status`, etc (slash e prefixo)
 - [x] **Integração DeepSeek**: API para geração de aventuras com contexto histórico
 - [x] **Sistema de Tutorial**: Guia interativo para novos jogadores
 - [x] **Status Embed**: Visualização elegante do progresso da aventura
 - [x] **Gestão de Sessões**: Histórico mantém últimas 8 interações por desempenho
+- [x] **Sistema de Resumo**: Resumos automáticos para histórias longas
+- [x] **Suporte a DMs**: Jogável tanto em canal designado quanto por mensagem privada
+- [x] **Comandos de Gerenciamento**:
+  - `/rpg_personagens` - Lista todos os personagens
+  - `/rpg_usar_personagem [ID]` - Seleciona personagem ativo
+  - `/rpg_deletar_personagem [ID]` - Remove personagem
+  - `/rpg_ajuda` - Tutorial manual
 
 ### Funcionalidades em Andamento:
-- [ ] **Sistema de Itens**: Inventário e equipamentos para personagens
-- [ ] **Sistema de Combate**: Resolução automática de conflitos baseada em atributos
-- [ ] **Múltiplas Aventuras**: Escolha entre diferentes cenários e temas
-- [ ] **Achievements**: Conquistas e recompensas por progresso
+🦗🦗🦗🦗 nao tem nada mais por enquanto...
 
 ### Tecnologias Utilizadas:
 - **Database**: MariaDB com SQLAlchemy ORM async
