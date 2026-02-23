@@ -1,4 +1,4 @@
-#### PIX via Pagbank: Integração [██████████] **100%**
+#### PIX: Integração [██████████] **100%**
 - [x] Configuração da API 
 - [x] Geração de QR Code dinâmico
 - [x] Sistema básico de webhooks

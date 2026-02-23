@@ -13,7 +13,7 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 ## 🚧 Status do Projeto
 **Este projeto está em Desenvolvimento Ativo**
 
-#### PIX via Pagbank: Integração [██████████] **100%**
+#### PIX: Integração [██████████] **100%**
 
 #### Cartão de Crédito: Integração [██████████] **100%**
 

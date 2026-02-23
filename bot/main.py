@@ -10,6 +10,7 @@ from bot.database.models import Apoiador
 from bot.shared import set_bot_instance
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select
 
 # Configuração básica de logging
 logging.basicConfig(
@@ -33,7 +34,7 @@ class DatabaseManager:
         """Obtém um apoiador pelo Discord ID e Guild ID"""
         async with AsyncSessionLocal() as session:
             result = await session.execute(
-                discord.select(Apoiador).where(
+                select(Apoiador).where(
                     Apoiador.discord_id == discord_id,
                     Apoiador.guild_id == guild_id
                 )
