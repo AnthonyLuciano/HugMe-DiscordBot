@@ -5,11 +5,9 @@ import threading
 import uvicorn
 from bot.config import Config as app_config
 from discord.ext import commands
-from bot.database import Base
+from bot.database import Base, engine, AsyncSessionLocal
 from bot.database.models import Apoiador
 from bot.shared import set_bot_instance
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
 
 # Configuração básica de logging
@@ -20,13 +18,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Carrega variáveis do arquivo .env
-
-
-DATABASE_URL = app_config.DATABASE_URL
-# Engine async
-engine = create_async_engine(DATABASE_URL, echo=True, future=True)
-AsyncSessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
-
+# (engine and AsyncSessionLocal are imported from bot.database)
 
 # Gerenciamento do banco de dados
 class DatabaseManager:
