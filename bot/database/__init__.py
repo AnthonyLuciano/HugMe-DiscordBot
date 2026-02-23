@@ -1,28 +1,30 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from bot.config import config
-from sqlalchemy.exc import ArgumentError
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker, declarative_base
+from starlette.config import Config as StarletteConfig
+from bot.config import config
 
 
-# Cria a conexão com o PostgreSQL
-engine = create_engine(
-    config.DATABASE_URL, # type: ignore
-    pool_pre_ping=True,  # Verifica conexão antes de usar
-    echo=False  # Altere para True para ver logs SQL (útil em desenvolvimento)
-    
+# Create async engine using DATABASE_URL (expects mysql+aiomysql://...)
+DATABASE_URL = config.DATABASE_URL
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL not configured")
+
+engine = create_async_engine(DATABASE_URL, echo=False, future=True)
+
+# Async session factory
+AsyncSessionLocal = sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+    autocommit=False,
 )
 
-# Add async configuration
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-def get_db():
-    """Fornece uma sessão do banco de dados"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+
+async def get_db():
+    """Async DB session generator for FastAPI/async code."""
+    async with AsyncSessionLocal() as session:
+        yield session
 

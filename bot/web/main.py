@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from queue import Queue
 
 import httpx
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -11,14 +11,14 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
 
 from bot.config import config as app_config
-from bot.database import SessionLocal, get_db
+from bot.database import AsyncSessionLocal, get_db
 from bot.database.models import Apoiador, GuildConfig
 from bot.servicos.VerificacaoMembro import VerificacaoMembro
 from bot.shared import get_bot_instance
@@ -92,19 +92,20 @@ async def get_current_admin(credentals: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=403, detail="Permissão inválida")
     return True
 
-def check_expirations():
-    with SessionLocal() as session:
+async def check_expirations():
+    async with AsyncSessionLocal() as session:
         now = datetime.now(timezone.utc)
-        expired = session.query(Apoiador).filter(
-            Apoiador.data_expiracao < now,
-            Apoiador.ativo == True
-        ).all()
+        result = await session.execute(
+            select(Apoiador).where(Apoiador.data_expiracao < now, Apoiador.ativo == True)
+        )
+        expired = result.scalars().all()
         for apoiador in expired:
             apoiador.ativo = False
             logger.info(f"Apoiador expirado: {apoiador.discord_id}")
-        session.commit()
+        await session.commit()
 
-scheduler = BackgroundScheduler()
+# Use AsyncIOScheduler to run the async task periodically
+scheduler = AsyncIOScheduler()
 scheduler.add_job(check_expirations, 'interval', hours=6)
 scheduler.start()
 
@@ -170,7 +171,7 @@ async def auth(request: Request):
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
     
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request, db: Session = Depends(get_db)):
+async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     user = request.session.get('user')
     if not user:
         raise HTTPException(status_code=401, detail="Não autenticado.")
@@ -184,7 +185,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         except Exception:
             user['admin'] = False
 
-    apoiadores = db.query(Apoiador).all()
+    result = await db.execute(select(Apoiador))
+    apoiadores = result.scalars().all()
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "user": user,
@@ -228,7 +230,7 @@ async def servers(request: Request):
             raise HTTPException(status_code=500, detail="Erro interno ao carregar servidores.")
 
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_panel(request: Request, db: Session = Depends(get_db)):
+async def admin_panel(request: Request, db: AsyncSession = Depends(get_db)):
     user = request.session.get('user')
     if not user:
         raise HTTPException(status_code=401, detail="Não autenticado")
@@ -245,7 +247,8 @@ async def admin_panel(request: Request, db: Session = Depends(get_db)):
             raise HTTPException(status_code=403, detail="Falha ao verificar permissões")
 
     metricas = await admin_metric()
-    apoiadores = db.query(Apoiador).all()
+    result = await db.execute(select(Apoiador))
+    apoiadores = result.scalars().all()
 
     return templates.TemplateResponse("admin.html", {
         "request": request,
@@ -257,13 +260,18 @@ async def admin_panel(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/admin/metrics", dependencies=[Depends(get_current_admin)])
 async def admin_metric():
-    with SessionLocal() as session:
-        total = session.query(Apoiador).count()
-        active = session.query(Apoiador).filter_by(ativo=True).count()
-        expired = session.query(Apoiador).filter(Apoiador.data_expiracao < datetime.now(timezone.utc)).count()
-        pending_roles = session.query(Apoiador).filter_by(ativo=True, cargo_atribuido=False).count()
-        webhook_failures = session.query(func.sum(GuildConfig.webhook_failures)).scalar() or 0
-        
+    async with AsyncSessionLocal() as session:
+        total_res = await session.execute(select(func.count()).select_from(Apoiador))
+        total = total_res.scalar() or 0
+        active_res = await session.execute(select(func.count()).select_from(Apoiador).where(Apoiador.ativo == True))
+        active = active_res.scalar() or 0
+        expired_res = await session.execute(select(func.count()).select_from(Apoiador).where(Apoiador.data_expiracao < datetime.now(timezone.utc)))
+        expired = expired_res.scalar() or 0
+        pending_res = await session.execute(select(func.count()).select_from(Apoiador).where(Apoiador.ativo == True, Apoiador.cargo_atribuido == False))
+        pending_roles = pending_res.scalar() or 0
+        webhook_res = await session.execute(select(func.sum(GuildConfig.webhook_failures)))
+        webhook_failures = webhook_res.scalar() or 0
+
         logger.info(f"Métricas carregadas: total={total}, ativos={active}, expirados={expired}, roles pendentes={pending_roles}, falhas webhook={webhook_failures}")
 
         return {
@@ -276,25 +284,55 @@ async def admin_metric():
         }
 
 @app.post("/admin/set-role", dependencies=[Depends(get_current_admin)])
-async def set_supporter_role(request: Request, db: Session = Depends(get_db)):
+async def set_supporter_role(request: Request, db: AsyncSession = Depends(get_db)):
     data = await request.json()
     guild_id = data.get("guild_id")
     role_id = data.get("role_id")
 
     if not guild_id or not role_id:
         raise HTTPException(status_code=400, detail="guild_id ou role_id ausente, ai me quebra")
-    with SessionLocal() as session:
-        guild_config = session.query(GuildConfig).filter_by(guild_id=guild_id).first()
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(GuildConfig).filter_by(guild_id=guild_id))
+        guild_config = result.scalars().first()
         if not guild_config:
             guild_config = GuildConfig(guild_id=guild_id, cargo_apoiador_id=role_id)
         else:
             guild_config.cargo_apoiador_id = role_id
-        
+
         session.add(guild_config)
-        session.commit()
+        await session.commit()
         logger.info(f"Cargo de apoiador atualizado para guild_id={guild_id}, role_id={role_id}")
     
     return {"status": "sucesso", "guild_id": guild_id, "role_id": role_id}
+
+
+@app.post("/admin/set-supporter-roles", dependencies=[Depends(get_current_admin)])
+async def set_supporter_roles(request: Request, db: AsyncSession = Depends(get_db)):
+    """Recebe um JSON com 'guild_id' e 'supporter_roles' (dict nível->role_id) e salva em GuildConfig.supporter_roles."""
+    data = await request.json()
+    guild_id = data.get("guild_id")
+    supporter_roles = data.get("supporter_roles")
+
+    if not guild_id or not supporter_roles or not isinstance(supporter_roles, dict):
+        raise HTTPException(status_code=400, detail="guild_id ausente ou supporter_roles inválido (esperado dict)")
+
+    # Limitar até 9 níveis
+    if len(supporter_roles) > 9:
+        raise HTTPException(status_code=400, detail="Máximo de 9 níveis permitidos")
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(GuildConfig).filter_by(guild_id=guild_id))
+        guild_config = result.scalars().first()
+        if not guild_config:
+            guild_config = GuildConfig(guild_id=guild_id, supporter_roles=supporter_roles)
+        else:
+            guild_config.supporter_roles = supporter_roles
+
+        session.add(guild_config)
+        await session.commit()
+        logger.info(f"Supporter roles atualizados para guild_id={guild_id}: {supporter_roles}")
+
+    return {"status": "sucesso", "guild_id": guild_id, "supporter_roles": supporter_roles}
 
 @app.post("/webhook")
 async def legacy_webhook(request: Request):
@@ -325,27 +363,39 @@ async def kofi_webhook(request: Request):
         else:
             discord_id = "kofi_anon_" + str(int(datetime.now(timezone.utc).timestamp()))
 
-        with SessionLocal() as session:
-            exists_dupped = session.query(Apoiador).filter_by(id_pagamento=transaction_id).first()
-            if exists_dupped:
-                logger.warning(f"Transação Ko-fi duplicada detectada: {transaction_id}")
-                return {"status": "duplicado"}
-            
-            apoiador = Apoiador(
-                discord_id=discord_id,
-                guild_id="0",
-                id_pagamento=transaction_id,
-                tipo_apoio="kofi",
-                email_doador=data.get("email"),
-                valor_doacao=int(float(data["amount"]) * 100),
-                data_inicio=datetime.now(timezone.utc),
-                data_expiracao=datetime.now(timezone.utc) + timedelta(days=30) if data["type"] == "Subscription" else None,
-                ativo=True,
-                ja_pago=True,
-            )
-            session.add(apoiador)
-            session.commit()
-            logger.info(f"Apoiador registrado: {discord_id}, tipo={data['type']}, valor={data['amount']}")
+        # Alguns drivers MySQL podem lançar 'Command out of sync' em condições de concorrência;
+        # tente algumas vezes com uma nova sessão antes de falhar.
+        db_attempts = 2
+        for attempt in range(db_attempts):
+            try:
+                async with AsyncSessionLocal() as session:
+                    result = await session.execute(select(Apoiador).filter_by(id_pagamento=transaction_id))
+                    exists_dupped = result.scalars().first()
+                    if exists_dupped:
+                        logger.warning(f"Transação Ko-fi duplicada detectada: {transaction_id}")
+                        return {"status": "duplicado"}
+
+                    apoiador = Apoiador(
+                        discord_id=discord_id,
+                        guild_id="0",
+                        id_pagamento=transaction_id,
+                        tipo_apoio="kofi",
+                        email_doador=data.get("email"),
+                        valor_doacao=int(float(data["amount"]) * 100),
+                        data_inicio=datetime.now(timezone.utc),
+                        data_expiracao=datetime.now(timezone.utc) + timedelta(days=30) if data["type"] == "Subscription" else None,
+                        ativo=True,
+                        ja_pago=True,
+                    )
+                    session.add(apoiador)
+                    await session.commit()
+                    logger.info(f"Apoiador registrado: {discord_id}, tipo={data['type']}, valor={data['amount']}")
+                break
+            except OperationalError as oe:
+                logger.warning(f"OperationalError ao gravar Apoiador (tentativa {attempt+1}/{db_attempts}): {oe}")
+                if attempt + 1 >= db_attempts:
+                    raise
+                await asyncio.sleep(0.2)
         bot = get_bot_instance()
         if bot:
             verificador = VerificacaoMembro(bot)
@@ -355,7 +405,8 @@ async def kofi_webhook(request: Request):
                 sucesso = await verificador.atribuir_cargo_apos_pagamento(
                     discord_id,
                     0,
-                    cargo_apoiador
+                    cargo_id=cargo_apoiador,
+                    nivel=getattr(apoiador, 'nivel', None)
                 )
                 if sucesso:
                     logger.info(f"Cargo atribuído automaticamente para {discord_id} via Ko-fi")

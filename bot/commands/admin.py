@@ -3,7 +3,8 @@ import logging
 import os
 from discord.ext import commands
 from bot.database.models import PixConfig
-from bot.database import SessionLocal
+from bot.database import AsyncSessionLocal
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +30,9 @@ class AdminCommands(commands.Cog):
             if not image_url.startswith(('http://', 'https://')):
                 raise ValueError("URL deve começar com http:// ou https://")
 
-            with SessionLocal() as session:
-                config = session.query(PixConfig).first()
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(PixConfig))
+                config = result.scalars().first()
                 if not config:
                     config = PixConfig(
                         static_qr_url=image_url,
@@ -46,9 +48,9 @@ class AdminCommands(commands.Cog):
                     config.nome_titular = nome_titular
                     config.cidade = cidade
                     config.atualizado_por = str(ctx.author.id)
-                
+
                 session.add(config)
-                session.commit()
+                await session.commit()
 
             await ctx.send(f"✅ QR Code atualizado para: {image_url}" + 
                          (f" e chave PIX para: {chave}" if chave else ""), 

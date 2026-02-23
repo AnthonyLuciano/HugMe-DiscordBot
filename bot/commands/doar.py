@@ -3,8 +3,9 @@ import json
 import re, discord, logging, os, httpx
 from bot.servicos.VerificacaoMembro import VerificacaoMembro
 from bot.config import Config as app_config
-from bot.database import SessionLocal
+from bot.database import AsyncSessionLocal
 from bot.database.models import Apoiador, PixConfig
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta, timezone
 from discord.ext import commands
@@ -68,22 +69,22 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
             guild_id = str(interaction.guild.id) if interaction.guild else "0"
 
             # --- Salva ou atualiza no banco ---
-            with SessionLocal() as session:
-                try:
-                    apoiador = session.query(Apoiador).filter_by(
+            try:
+                async with AsyncSessionLocal() as session:
+                    result = await session.execute(select(Apoiador).filter_by(
                         discord_id=str(interaction.user.id),
                         guild_id=guild_id
-                    ).first()
-                    
+                    ))
+                    apoiador = result.scalars().first()
+
                     if apoiador:
-                        # Atualiza apenas o id_pagamento e dados
                         apoiador.id_pagamento = reference_id
                         apoiador.tipo_apoio = "pix"
                         apoiador.valor_doacao = amount_cents
                         apoiador.data_inicio = datetime.now(timezone.utc)
                         apoiador.ja_pago = False
+                        session.add(apoiador)
                     else:
-                        # Cria novo registro
                         apoiador = Apoiador(
                             discord_id=str(interaction.user.id),
                             guild_id=guild_id,
@@ -95,19 +96,19 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                         )
                         session.add(apoiador)
 
-                    session.commit()
-                except Exception as e:
-                    session.rollback()
-                    logger.error(f"Erro ao salvar doação no banco: {e}")
-                    await interaction.response.send_message(
-                        "❌ Erro ao registrar a doação. Tente novamente mais tarde.",
-                        ephemeral=True
-                    )
-                    return
+                    await session.commit()
+            except Exception as e:
+                logger.error(f"Erro ao salvar doação no banco: {e}")
+                await interaction.response.send_message(
+                    "❌ Erro ao registrar a doação. Tente novamente mais tarde.",
+                    ephemeral=True
+                )
+                return
 
             # --- Busca configuração PIX ---
-            with SessionLocal() as session:
-                config = session.query(PixConfig).first()
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(PixConfig).limit(1))
+                config = result.scalars().first()
                 if not config:
                     await interaction.response.send_message(
                         "❌ Configuração PIX não encontrada.",
@@ -365,18 +366,21 @@ class DoarCommands(commands.Cog):
             embed.set_footer(text="✅ Pagamento confirmado")
             await message.edit(embeds=[embed], view=None)
 
-            with SessionLocal() as session:
-                apoiador = session.query(Apoiador).filter_by(id_pagamento=reference_id).first()
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(Apoiador).filter_by(id_pagamento=reference_id))
+                apoiador = result.scalars().first()
                 if apoiador:
                     apoiador.ja_pago = True
                     apoiador.ultimo_pagamento = get_brasilia_time()
-                    session.commit()
+                    session.add(apoiador)
+                    await session.commit()
                     cargo_apoiador_id = app_config.APOIADOR_ID
                     logger.info(f"Tentando atribuir cargo {cargo_apoiador_id} para {apoiador.discord_id} no servidor {apoiador.guild_id}")
                     sucess = await self.verificador.atribuir_cargo_apos_pagamento(
                         apoiador.discord_id,
                         int(apoiador.guild_id),
-                        cargo_apoiador_id
+                        cargo_id=cargo_apoiador_id,
+                        nivel=getattr(apoiador, 'nivel', None)
                     )
                     
                     if not sucess:
@@ -452,6 +456,98 @@ class DoarCommands(commands.Cog):
         except Exception as e:
             logger.error(f"Erro inesperado em doar: {str(e)}", exc_info=True)
             await ctx.send("❌ Falha ao processar o comando. Notifique os administradores.", ephemeral=True)
+
+    @commands.is_owner()
+    @commands.hybrid_command(name="sim_doar", description="(TEST) Simula uma doação e tenta atribuir cargo ao usuário")
+    async def sim_doar(self, ctx: commands.Context, member: discord.Member = None, amount: float = 1.0, nivel: int = 1):
+        """Comando de teste para criar um Apoiador e disparar a atribuição de cargo.
+        O `guild_id` é detectado automaticamente a partir do `member` (quando fornecido) ou de `ctx.guild`.
+        Uso: /sim_doar [member] [amount] [nivel]
+        """
+        try:
+            target = member or ctx.author
+            discord_id = str(target.id)
+            if member and member.guild:
+                guild_str = str(member.guild.id)
+            elif ctx.guild:
+                guild_str = str(ctx.guild.id)
+            else:
+                guild_str = "0"
+            amount_cents = int(amount * 100)
+            reference_id = f"sim_doacao_{int(datetime.now(timezone.utc).timestamp())}"
+
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(Apoiador).filter_by(discord_id=discord_id, guild_id=guild_str)
+                )
+                apoiador = result.scalars().first()
+                if apoiador:
+                    # Atualiza campos existentes para simulação
+                    apoiador.id_pagamento = reference_id
+                    apoiador.tipo_apoio = "simulado"
+                    apoiador.valor_doacao = amount_cents
+                    apoiador.data_inicio = datetime.now(timezone.utc)
+                    apoiador.ja_pago = True
+                    apoiador.ativo = True
+                    apoiador.nivel = nivel
+                    session.add(apoiador)
+                else:
+                    apoiador = Apoiador(
+                        discord_id=discord_id,
+                        guild_id=guild_str,
+                        id_pagamento=reference_id,
+                        tipo_apoio="simulado",
+                        valor_doacao=amount_cents,
+                        data_inicio=datetime.now(timezone.utc),
+                        ja_pago=True,
+                        ativo=True,
+                        nivel=nivel
+                    )
+                    session.add(apoiador)
+                await session.commit()
+
+            # Opcional: envie um webhook local para testar também o fluxo web
+            webhook_url = f"http://127.0.0.1:26173/kofi-webhook"
+            payload = {
+                "transaction_id": reference_id,
+                "type": "Donation",
+                "from_name": str(target),
+                "amount": f"{amount:.2f}",
+                "currency": "BRL",
+                "message": "Simulação de doação via comando sim_doar",
+                "email": None
+            }
+            # Inclui token de verificação se disponível
+            try:
+                token = app_config.KOFI_TOKEN
+            except Exception:
+                token = None
+            if token:
+                payload["verification_token"] = token
+
+            webhook_ok = False
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    form = {"data": json.dumps(payload)}
+                    resp = await client.post(webhook_url, data=form)
+                    webhook_ok = resp.status_code == 200
+            except Exception as e:
+                logger.warning(f"Falha ao enviar webhook local de simulação: {e}")
+
+            # Tenta atribuir cargo usando o verificador (local)
+            guild_int = int(guild_str) if guild_str.isdigit() else 0
+            success = await self.verificador.atribuir_cargo_apos_pagamento(
+                discord_id,
+                guild_int,
+                cargo_id=None,
+                nivel=nivel
+            )
+
+            await ctx.send(f"Simulação criada (ref {reference_id}). Atribuição de cargo: {'sucesso' if success else 'falha'}. Webhook enviado: {'ok' if webhook_ok else 'falhou'}")
+
+        except Exception as e:
+            logger.error(f"Erro em sim_doar: {e}")
+            await ctx.send(f"❌ Erro ao simular doação: {e}")
 
 # --- Setup ---
 async def setup(bot):

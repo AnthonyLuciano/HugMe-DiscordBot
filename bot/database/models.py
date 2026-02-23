@@ -95,3 +95,5 @@ class GuildConfig(Base):
     role_prefix: Mapped[str] = mapped_column(String(50), default="Apoia")
     cargo_apoiador_id: Mapped[str | None] = mapped_column(String(20))  # New field for role ID
     webhook_failures: Mapped[int] = mapped_column(Integer, default=0)  # Failure counter
+    # Mapeamento de níveis de apoio para IDs de cargos (ex: {"1": "1234", "2": "5678"})
+    supporter_roles: Mapped[dict] = mapped_column(JSON, default=dict)

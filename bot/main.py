@@ -63,13 +63,25 @@ class HugMeBot(commands.Bot):
         self.web_thread = None
 
     def start_web_server(self):
-        """Inicia o servidor web em uma thread separada"""
-        def run_web():
-            uvicorn.run("bot.web.main:app", host="0.0.0.0", port=26173, reload=False)
-
-        self.web_thread = threading.Thread(target=run_web, daemon=True)
-        self.web_thread.start()
-        logger.info("Servidor web iniciado na porta 26173")
+        """Schedule the uvicorn server to run in the bot's asyncio loop."""
+        try:
+            config = uvicorn.Config("bot.web.main:app", host="0.0.0.0", port=26173, loop="asyncio", lifespan="on")
+            server = uvicorn.Server(config)
+            # Run server.serve() as a background task in the bot's event loop
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(server.serve())
+                logger.info("Servidor web agendado no loop asyncio atual na porta 26173")
+            except RuntimeError:
+                # No running loop; fallback to thread-based start
+                def run_web():
+                    uvicorn.run("bot.web.main:app", host="0.0.0.0", port=26173, reload=False)
+                self.web_thread = threading.Thread(target=run_web, daemon=True)
+                self.web_thread.start()
+                logger.info("Servidor web iniciado em thread (fallback) na porta 26173")
+        except Exception as e:
+            logger.error(f"Falha ao iniciar servidor web: {e}")
 
     async def setup_hook(self):
         """Configurações iniciais quando o bot está inicializando"""

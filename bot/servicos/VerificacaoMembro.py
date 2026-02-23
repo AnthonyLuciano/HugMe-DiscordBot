@@ -1,8 +1,8 @@
 import discord, logging
 from datetime import datetime, timezone
-from bot.database import engine
-from bot.database.models import Apoiador
-from sqlalchemy.orm import Session
+from bot.database import engine, AsyncSessionLocal
+from bot.database.models import Apoiador, GuildConfig
+from sqlalchemy import select, update
 
 logging.basicConfig(
     level=logging.INFO,
@@ -87,7 +87,27 @@ class VerificacaoMembro:
     
     async def obter_apoiador(self, discord_id: str, guild_id: str) -> Apoiador | None:
         """Obtém um apoiador pelo Discord ID e Guild ID"""
-        return self.db.obter_apoiador(discord_id, guild_id)
+        return await self.db.obter_apoiador(discord_id, guild_id)
+
+    async def obter_role_por_nivel(self, guild_id: str, nivel: int) -> int | None:
+        """Retorna o role_id configurado para um determinado nível no GuildConfig."""
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(GuildConfig).filter_by(guild_id=str(guild_id)))
+                cfg = result.scalars().first()
+                if not cfg or not cfg.supporter_roles:
+                    return None
+                key = str(nivel)
+                role_id = cfg.supporter_roles.get(key)
+                if role_id:
+                    try:
+                        return int(role_id)
+                    except Exception:
+                        return None
+                return None
+        except Exception as e:
+            logger.error(f"Erro ao obter role por nível: {e}")
+            return None
 
 
     async def aplicar_cargo_se_qualificado(self, member: discord.Member, cargo_id: int, tempo_minimo_dias: int, nivel_apoio: int | None = None) -> str:
@@ -115,7 +135,7 @@ class VerificacaoMembro:
             logger.error(f"Erro ao verificar apoiador: {e}")
             return "Erro ao verificar status"
 
-    async def atribuir_cargo_apos_pagamento(self, discord_id: str, guild_id: int, cargo_id: int) -> bool:
+    async def atribuir_cargo_apos_pagamento(self, discord_id: str, guild_id: int, cargo_id: int | None = None, nivel: int | None = None) -> bool:
         try:
             guild = self.bot.get_guild(guild_id)
             if not guild:
@@ -136,17 +156,42 @@ class VerificacaoMembro:
                     return False
                 except discord.HTTPException as e:
                     logger.error(f"Erro ao buscar membro: {e}")
-                    return False
-        
-        # Buscar cargo de forma mais robusta
+                    return False  
+        # Determinar o cargo a aplicar: prioridade -> nivel (se fornecido) -> cargo_id -> GuildConfig.cargo_apoiador_id
             cargo = None
+            chosen_role_id = None
+
+            if nivel is not None:
+                chosen_role_id = await self.obter_role_por_nivel(str(guild_id), nivel)
+
+            if chosen_role_id is None and cargo_id is not None:
+                chosen_role_id = int(cargo_id)
+
+            if chosen_role_id is None:
+                # tentar obter o cargo padrão em GuildConfig
+                try:
+                    async with AsyncSessionLocal() as session:
+                        result = await session.execute(select(GuildConfig).filter_by(guild_id=str(guild_id)))
+                        cfg = result.scalars().first()
+                        if cfg and cfg.cargo_apoiador_id:
+                            try:
+                                chosen_role_id = int(cfg.cargo_apoiador_id)
+                            except Exception:
+                                chosen_role_id = None
+                except Exception as e:
+                    logger.error(f"Erro ao carregar GuildConfig: {e}")
+
+            if chosen_role_id is None:
+                logger.error(f"Nenhum cargo configurado para atribuir no servidor {guild_id}")
+                return False
+
             try:
-                cargo = guild.get_role(int(cargo_id))
+                cargo = guild.get_role(int(chosen_role_id))
                 if not cargo:
-                # Listar todos os cargos para debugging
+                    # Listar todos os cargos para debugging
                     all_roles = [f"{r.name} ({r.id})" for r in guild.roles]
                     logger.info(f"Cargos disponíveis no servidor: {', '.join(all_roles)}")
-                    logger.error(f"Cargo ID {cargo_id} não encontrado entre {len(guild.roles)} cargos")
+                    logger.error(f"Cargo ID {chosen_role_id} não encontrado entre {len(guild.roles)} cargos")
                     return False
             except Exception as e:
                 logger.error(f"Erro ao buscar cargo: {e}")
@@ -172,10 +217,16 @@ class VerificacaoMembro:
         # Atualiza o status no banco de dados
             apoiador = await self.obter_apoiador(discord_id, str(guild_id))
             if apoiador:
-                apoiador.cargo_atribuido = True
-                with Session(engine) as session:
-                    session.add(apoiador)
-                    session.commit()
+                try:
+                    async with AsyncSessionLocal() as session:
+                        await session.execute(
+                            update(Apoiador)
+                            .where(Apoiador.discord_id == str(discord_id), Apoiador.guild_id == str(guild_id))
+                            .values(cargo_atribuido=True)
+                        )
+                        await session.commit()
+                except Exception as e:
+                    logger.error(f"Erro ao atualizar apoiador no DB: {e}")
         
             return True
         
