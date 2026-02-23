@@ -371,24 +371,30 @@ async def kofi_webhook(request: Request):
                 async with AsyncSessionLocal() as session:
                     result = await session.execute(select(Apoiador).filter_by(id_pagamento=transaction_id))
                     exists_dupped = result.scalars().first()
-                    if exists_dupped:
+                    is_test = data.get("is_test") is True or data.get("is_test") == "True"
+                    if exists_dupped and not is_test:
                         logger.warning(f"Transação Ko-fi duplicada detectada: {transaction_id}")
                         return {"status": "duplicado"}
 
-                    apoiador = Apoiador(
-                        discord_id=discord_id,
-                        guild_id="0",
-                        id_pagamento=transaction_id,
-                        tipo_apoio="kofi",
-                        email_doador=data.get("email"),
-                        valor_doacao=int(float(data["amount"]) * 100),
-                        data_inicio=datetime.now(timezone.utc),
-                        data_expiracao=datetime.now(timezone.utc) + timedelta(days=30) if data["type"] == "Subscription" else None,
-                        ativo=True,
-                        ja_pago=True,
-                    )
-                    session.add(apoiador)
-                    await session.commit()
+                    if exists_dupped and is_test:
+                        # Em teste, reutilize o registro existente em vez de inserir duplicado
+                        apoiador = exists_dupped
+                        logger.info(f"Usando registro existente para transação de teste: {transaction_id}")
+                    else:
+                        apoiador = Apoiador(
+                            discord_id=discord_id,
+                            guild_id="0",
+                            id_pagamento=transaction_id,
+                            tipo_apoio="kofi",
+                            email_doador=data.get("email"),
+                            valor_doacao=int(float(data["amount"]) * 100),
+                            data_inicio=datetime.now(timezone.utc),
+                            data_expiracao=datetime.now(timezone.utc) + timedelta(days=30) if data["type"] == "Subscription" else None,
+                            ativo=True,
+                            ja_pago=True,
+                        )
+                        session.add(apoiador)
+                        await session.commit()
                     logger.info(f"Apoiador registrado: {discord_id}, tipo={data['type']}, valor={data['amount']}")
                 break
             except OperationalError as oe:
@@ -397,21 +403,30 @@ async def kofi_webhook(request: Request):
                     raise
                 await asyncio.sleep(0.2)
         bot = get_bot_instance()
+        sucesso = False
         if bot:
             verificador = VerificacaoMembro(bot)
             cargo_apoiador = app_config.APOIADOR_ID2
-        
+
             if discord_id and not discord_id.startswith("kofi_anon_"):
-                sucesso = await verificador.atribuir_cargo_apos_pagamento(
-                    discord_id,
-                    0,
-                    cargo_id=cargo_apoiador,
-                    nivel=getattr(apoiador, 'nivel', None)
-                )
-                if sucesso:
-                    logger.info(f"Cargo atribuído automaticamente para {discord_id} via Ko-fi")
-                else:
-                    logger.warning(f"Falha ao atribuir cargo para {discord_id} via Ko-fi")
+                # Tentar atribuir o cargo nos servidores que o bot compartilha com o usuário
+                for guild in bot.guilds:
+                    try:
+                        logger.info(f"Tentando atribuir cargo para {discord_id} no servidor {guild.id}")
+                        res = await verificador.atribuir_cargo_apos_pagamento(
+                            discord_id,
+                            guild.id,
+                            cargo_id=cargo_apoiador,
+                            nivel=getattr(apoiador, 'nivel', None)
+                        )
+                        if res:
+                            sucesso = True
+                            logger.info(f"Cargo atribuído automaticamente para {discord_id} no servidor {guild.id}")
+                            break
+                    except Exception as e:
+                        logger.error(f"Erro ao tentar atribuir cargo no servidor {guild.id}: {e}")
+                if not sucesso:
+                    logger.warning(f"Falha ao atribuir cargo para {discord_id} via Ko-fi em todos os servidores do bot")
         else:
             logger.warning("Bot instance não disponível para atribuir cargo via Ko-fi")
 
@@ -432,9 +447,27 @@ async def kofi_webhook(request: Request):
                     {"name": "Cargo Atribuído", "value": "✅ Sim" if sucesso else "❌ Falha" if discord_id and not discord_id.startswith("kofi_anon_") else "⏸️ Anônimo"}
                 ]
             }
-            async with httpx.AsyncClient() as client:
-                await client.post(donohook_url, json={"embeds": [embed]})
-                logger.info(f"Notificação enviada para Discord via webhook: {donohook_url}")
+            logger.info(f"Enviando notificação para webhook: {donohook_url}")
+            try:
+                async with httpx.AsyncClient() as client:
+                    payload = {"embeds": [embed]}
+                    logger.info(f"Webhook payload: {json.dumps(payload, ensure_ascii=False)}")
+                    resp = await client.post(donohook_url, json=payload)
+                    logger.info(f"Resposta do webhook: {resp.status_code} - {resp.text}")
+                    if resp.status_code == 400:
+                        logger.warning("Embed inválido, tentando fallback com 'content' simples")
+                        fallback = {"content": f"📢 Nova doação: {data.get('from_name', 'Anônimo')} — {data.get('amount')} {data.get('currency')}"}
+                        resp2 = await client.post(donohook_url, json=fallback)
+                        logger.info(f"Resposta fallback webhook: {resp2.status_code} - {resp2.text}")
+                        if resp2.status_code >= 400:
+                            logger.warning("Fallback com 'content' também falhou, tentando embed mínimo")
+                            minimal = {"embeds": [{"title": "📊 Nova Doação Ko-fi", "description": f"De: {data.get('from_name', 'Anônimo')}\nValor: {data.get('amount')} {data.get('currency')}"}]}
+                            resp3 = await client.post(donohook_url, json=minimal)
+                            logger.info(f"Resposta minimal webhook: {resp3.status_code} - {resp3.text}")
+                    elif resp.status_code >= 400:
+                        logger.warning(f"Falha ao postar no webhook (status {resp.status_code})")
+            except Exception as e:
+                logger.error(f"Erro ao enviar notificação para Discord via webhook: {e}")
 
         return {"status": "sucesso"}
     except Exception as e:

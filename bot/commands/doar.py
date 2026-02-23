@@ -475,36 +475,41 @@ class DoarCommands(commands.Cog):
                 guild_str = "0"
             amount_cents = int(amount * 100)
             reference_id = f"sim_doacao_{int(datetime.now(timezone.utc).timestamp())}"
-
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    select(Apoiador).filter_by(discord_id=discord_id, guild_id=guild_str)
-                )
-                apoiador = result.scalars().first()
-                if apoiador:
-                    # Atualiza campos existentes para simulação
-                    apoiador.id_pagamento = reference_id
-                    apoiador.tipo_apoio = "simulado"
-                    apoiador.valor_doacao = amount_cents
-                    apoiador.data_inicio = datetime.now(timezone.utc)
-                    apoiador.ja_pago = True
-                    apoiador.ativo = True
-                    apoiador.nivel = nivel
-                    session.add(apoiador)
-                else:
-                    apoiador = Apoiador(
-                        discord_id=discord_id,
-                        guild_id=guild_str,
-                        id_pagamento=reference_id,
-                        tipo_apoio="simulado",
-                        valor_doacao=amount_cents,
-                        data_inicio=datetime.now(timezone.utc),
-                        ja_pago=True,
-                        ativo=True,
-                        nivel=nivel
+            # --- Cria/atualiza no banco para simulação (lógica antiga preservada) ---
+            try:
+                async with AsyncSessionLocal() as session:
+                    result = await session.execute(
+                        select(Apoiador).filter_by(discord_id=discord_id, guild_id=guild_str)
                     )
-                    session.add(apoiador)
-                await session.commit()
+                    apoiador = result.scalars().first()
+
+                    if apoiador:
+                        # Atualiza campos existentes para simulação
+                        apoiador.id_pagamento = reference_id
+                        apoiador.tipo_apoio = "simulado"
+                        apoiador.valor_doacao = amount_cents
+                        apoiador.data_inicio = datetime.now(timezone.utc)
+                        apoiador.ja_pago = True
+                        apoiador.ativo = True
+                        apoiador.nivel = nivel
+                        session.add(apoiador)
+                    else:
+                        apoiador = Apoiador(
+                            discord_id=discord_id,
+                            guild_id=guild_str,
+                            id_pagamento=reference_id,
+                            tipo_apoio="simulado",
+                            valor_doacao=amount_cents,
+                            data_inicio=datetime.now(timezone.utc),
+                            ja_pago=True,
+                            ativo=True,
+                            nivel=nivel
+                        )
+                        session.add(apoiador)
+                    await session.commit()
+            except Exception as e:
+                logger.error(f"Erro ao salvar simulação no banco: {e}")
+                apoiador = None
 
             # Opcional: envie um webhook local para testar também o fluxo web
             webhook_url = f"http://127.0.0.1:26173/kofi-webhook"
@@ -512,6 +517,8 @@ class DoarCommands(commands.Cog):
                 "transaction_id": reference_id,
                 "type": "Donation",
                 "from_name": str(target),
+                "discord_id": discord_id,
+                "guild_id": guild_str,
                 "amount": f"{amount:.2f}",
                 "currency": "BRL",
                 "message": "Simulação de doação via comando sim_doar",
@@ -524,6 +531,8 @@ class DoarCommands(commands.Cog):
                 token = None
             if token:
                 payload["verification_token"] = token
+            # Marca o webhook como teste — para que o handler trate duplicados
+            payload["is_test"] = True
 
             webhook_ok = False
             try:
@@ -533,15 +542,19 @@ class DoarCommands(commands.Cog):
                     webhook_ok = resp.status_code == 200
             except Exception as e:
                 logger.warning(f"Falha ao enviar webhook local de simulação: {e}")
-
-            # Tenta atribuir cargo usando o verificador (local)
+            # Tenta atribuir cargo localmente também (lógica antiga), mas o webhook
+            # receberá `is_test=True` para identificar que é uma simulação.
             guild_int = int(guild_str) if guild_str.isdigit() else 0
-            success = await self.verificador.atribuir_cargo_apos_pagamento(
-                discord_id,
-                guild_int,
-                cargo_id=None,
-                nivel=nivel
-            )
+            try:
+                success = await self.verificador.atribuir_cargo_apos_pagamento(
+                    discord_id,
+                    guild_int,
+                    cargo_id=None,
+                    nivel=nivel
+                )
+            except Exception as e:
+                logger.error(f"Erro ao tentar atribuir cargo localmente na simulação: {e}")
+                success = False
 
             await ctx.send(f"Simulação criada (ref {reference_id}). Atribuição de cargo: {'sucesso' if success else 'falha'}. Webhook enviado: {'ok' if webhook_ok else 'falhou'}")
 
