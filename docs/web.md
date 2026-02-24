@@ -13,16 +13,21 @@
      ```
 
 ## SSL / HTTPS
-- O servidor web é iniciado via `uvicorn` e, por padrão, tenta carregar
-  certificados localizados em `bot/certificates/hugmebot.online.pem` e
-  `.../hugmebot.online.key`.
-- Durante o deploy o processo pode ter um **cwd diferente** (por exemplo
-  `/home/container`), então esses caminhos são agora resolvidos a partir
-  do diretório do módulo (`bot/main.py`). Se os arquivos estiverem ausentes
-  (comuns em repositórios, pois a pasta está em `.gitignore`), o servidor
-  cairá para HTTP e logará um aviso.
-- Para habilitar TLS em produção, copie seu PEM e chave para `bot/certificates`
-  ou defina `SSL_CERTFILE`/`SSL_KEYFILE` no código antes de iniciar.
+- O servidor web é iniciado via `uvicorn` e carrega certificados a partir de
+  `bot/certificates/hugmebot.online.pem` e
+  `bot/certificates/hugmebot.online.key`.
+- Como alternativa, quando o primeiro diretório não existe o código também
+  verifica `/home/container/certificates`, que é onde algumas plataformas
+  montam chaves TLS fora do repositório. Isso permite que o bot funcione mesmo
+  se os arquivos não fizerem parte do clone.
+- Os caminhos são resolvidos a partir do diretório do módulo (`bot/main.py`)
+  em vez do cwd atual para evitar erros quando o processo é iniciado com outro
+  diretório de trabalho.
+- Se nenhuma das localizações contiver ambos os arquivos, o bot lança
+  `FileNotFoundError` citando todos os diretórios pesquisados, facilitando o
+  diagnóstico.
+- Para habilitar TLS em produção, copie ou monte os arquivos em uma dessas
+  pastas; não há necessidade de editar configurações ou variáveis de ambiente.
 
 ## Templates
 - **Dashboard**:

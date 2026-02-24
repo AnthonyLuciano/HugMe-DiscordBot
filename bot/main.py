@@ -61,18 +61,34 @@ class HugMeBot(commands.Bot):
         # the process working directory (which in some deployment setups
         # like Replit is `/home/container`).
         base_dir = os.path.abspath(os.path.dirname(__file__))
-        ssl_certificate = os.path.join(base_dir, "certificates", "hugmebot.online.pem")
-        ssl_keyfile = os.path.join(base_dir, "certificates", "hugmebot.online.key")
 
-        # verify the files exist; if they don't, warn and start without TLS
-        if not os.path.isfile(ssl_certificate) or not os.path.isfile(ssl_keyfile):
-            logger.warning(
-                "Certificado ou chave SSL não encontrados. "
-                "Iniciando servidor sem TLS."
-                f" (procurando {ssl_certificate} e {ssl_keyfile})"
+        # compute potential certificate directories. the project normally keeps
+        # them under bot/certificates, but some hosting environments (e.g.
+        # the Replit container) provide them at /home/container/certificates.
+        # check each location and use the first that contains both files.
+        candidate_dirs = [
+            os.path.join(base_dir, "certificates"),
+            "/home/container/certificates",
+        ]
+
+        ssl_certificate = None
+        ssl_keyfile = None
+        for d in candidate_dirs:
+            cert_path = os.path.join(d, "hugmebot.online.pem")
+            key_path = os.path.join(d, "hugmebot.online.key")
+            if os.path.isfile(cert_path) and os.path.isfile(key_path):
+                ssl_certificate = cert_path
+                ssl_keyfile = key_path
+                logger.info(f"Usando certificados em {d}")
+                break
+
+        # if we didn't find them in any known location, error out.
+        if not ssl_certificate or not ssl_keyfile:
+            # report the list of places we looked for easier debugging
+            seen = ", ".join(candidate_dirs)
+            raise FileNotFoundError(
+                f"Certificado ou chave SSL não encontrados em nenhum dos diretórios: {seen}"
             )
-            ssl_certificate = None
-            ssl_keyfile = None
 
         try:
             config = uvicorn.Config("bot.web.main:app",
