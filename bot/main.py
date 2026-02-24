@@ -57,8 +57,23 @@ class HugMeBot(commands.Bot):
 
     def start_web_server(self):
         """Schedule the uvicorn server to run in the bot's asyncio loop."""
-        ssl_certificate = "bot/certificates/hugmebot.online.pem"
-        ssl_keyfile = "bot/certificates/hugmebot.online.key"
+        # build absolute paths based on this source file so we don't depend on
+        # the process working directory (which in some deployment setups
+        # like Replit is `/home/container`).
+        base_dir = os.path.abspath(os.path.dirname(__file__))
+        ssl_certificate = os.path.join(base_dir, "certificates", "hugmebot.online.pem")
+        ssl_keyfile = os.path.join(base_dir, "certificates", "hugmebot.online.key")
+
+        # verify the files exist; if they don't, warn and start without TLS
+        if not os.path.isfile(ssl_certificate) or not os.path.isfile(ssl_keyfile):
+            logger.warning(
+                "Certificado ou chave SSL não encontrados. "
+                "Iniciando servidor sem TLS."
+                f" (procurando {ssl_certificate} e {ssl_keyfile})"
+            )
+            ssl_certificate = None
+            ssl_keyfile = None
+
         try:
             config = uvicorn.Config("bot.web.main:app",
                                     host="0.0.0.0",
