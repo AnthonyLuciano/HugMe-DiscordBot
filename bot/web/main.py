@@ -146,9 +146,7 @@ async def auth(request: Request):
         logger.info("Iniciando autenticação do usuário.")
         if oauth.discord is None:
             raise RuntimeError("Cliente OAuth do Discord não encontrado (Episódio II - Ataque do Auth-Token)")
-        # Build redirect_uri from the actual request to match /login
-        redirect_uri = f"{request.url.scheme}://{request.url.netloc}/auth"
-        token = await oauth.discord.authorize_access_token(request, redirect_uri=redirect_uri)
+        token = await oauth.discord.authorize_access_token(request)
         if not token:
             raise ValueError("Token de acesso não retornado pelo Discord. ai lasca tambem.")
         logger.info(f"Token de acesso obtido com sucesso: {token}")
