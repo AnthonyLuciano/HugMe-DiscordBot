@@ -57,8 +57,17 @@ class HugMeBot(commands.Bot):
 
     def start_web_server(self):
         """Schedule the uvicorn server to run in the bot's asyncio loop."""
+        ssl_certificate = "bot/certificates/hugmebot.online.pem"
+        ssl_keyfile = "bot/certificates/hugmebot.online.key"
         try:
-            config = uvicorn.Config("bot.web.main:app", host="0.0.0.0", port=26173, loop="asyncio", lifespan="on")
+            config = uvicorn.Config("bot.web.main:app",
+                                    host="0.0.0.0",
+                                    port=26173,
+                                    loop="asyncio",
+                                    lifespan="on",
+                                    ssl_certfile=ssl_certificate,
+                                    ssl_keyfile=ssl_keyfile
+                                    )
             server = uvicorn.Server(config)
             # Run server.serve() as a background task in the bot's event loop
             import asyncio
@@ -69,7 +78,13 @@ class HugMeBot(commands.Bot):
             except RuntimeError:
                 # No running loop; fallback to thread-based start
                 def run_web():
-                    uvicorn.run("bot.web.main:app", host="0.0.0.0", port=26173, reload=False)
+                    uvicorn.run("bot.web.main:app",
+                                host="0.0.0.0",
+                                port=26173,
+                                reload=False,
+                                ssl_certfile=ssl_certificate,
+                                ssl_keyfile=ssl_keyfile
+                                )
                 self.web_thread = threading.Thread(target=run_web, daemon=True)
                 self.web_thread.start()
                 logger.info("Servidor web iniciado em thread (fallback) na porta 26173")
