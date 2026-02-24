@@ -120,7 +120,8 @@ async def status():
 
 @app.get("/login")
 async def login(request: Request):
-    redirect_uri = request.url_for('auth')
+    # Build redirect_uri from the actual request to include port
+    redirect_uri = f"{request.url.scheme}://{request.url.netloc}/auth"
     if oauth.discord is None:
         raise RuntimeError("Cliente OAuth do Discord não encontrado (Episódio I - O Erro Fantasma)")
     return await oauth.discord.authorize_redirect(request, redirect_uri)
@@ -145,7 +146,9 @@ async def auth(request: Request):
         logger.info("Iniciando autenticação do usuário.")
         if oauth.discord is None:
             raise RuntimeError("Cliente OAuth do Discord não encontrado (Episódio II - Ataque do Auth-Token)")
-        token = await oauth.discord.authorize_access_token(request)
+        # Build redirect_uri from the actual request to match /login
+        redirect_uri = f"{request.url.scheme}://{request.url.netloc}/auth"
+        token = await oauth.discord.authorize_access_token(request, redirect_uri=redirect_uri)
         if not token:
             raise ValueError("Token de acesso não retornado pelo Discord. ai lasca tambem.")
         logger.info(f"Token de acesso obtido com sucesso: {token}")
