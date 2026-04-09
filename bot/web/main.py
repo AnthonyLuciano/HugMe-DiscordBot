@@ -378,10 +378,34 @@ async def auth(request: Request):
     
 @app.get("/dashboard")
 async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
+    """Content negotiation endpoint for the dashboard.
+
+    - If the client requests HTML (`Accept: text/html`), return the `dashboard.html` template.
+    - If the client requests JSON (`Accept: application/json`) or does a generic fetch, return JSON data.
+    """
     user = request.session.get('user')
     if not user:
         raise HTTPException(status_code=401, detail="Não autenticado.")
 
+    accept = request.headers.get("accept", "").lower()
+    wants_html = "text/html" in accept
+    wants_json = "application/json" in accept
+
+    # Serve HTML page when browser navigation requests text/html
+    if wants_html and not wants_json:
+        try:
+            template_path = os.path.join(os.path.dirname(__file__), "templates", "dashboard.html")
+            with open(template_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            # Replace placeholder API base in template with runtime origin (so frontend can call same host)
+            origin = f"{request.url.scheme}://{request.url.netloc}"
+            html = html.replace("const API_BASE = 'https://your-api-domain.com';", f"const API_BASE = '{origin}';")
+            return HTMLResponse(content=html)
+        except Exception as e:
+            logger.error(f"Falha ao carregar template do dashboard: {e}")
+            raise HTTPException(status_code=500, detail="Erro ao renderizar dashboard")
+
+    # Otherwise return JSON data (used by frontend fetch calls)
     async with httpx.AsyncClient() as client:
         headers = {"Authorization": f"Bearer {user['access_token']}"}
         try:
@@ -393,11 +417,10 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
 
     result = await db.execute(select(Apoiador))
     apoiadores = await safe_all(result)
-    
-    # Retorne JSON em vez de template
+
     return {
         "user": user,
-        "apoiadores": [apoiador.__dict__ for apoiador in apoiadores],  # Ou serialize adequadamente
+        "apoiadores": [apoiador.__dict__ for apoiador in apoiadores],
         "now": datetime.now(timezone.utc).isoformat()
     }
 
