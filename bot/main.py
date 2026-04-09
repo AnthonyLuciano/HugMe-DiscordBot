@@ -155,7 +155,21 @@ class HugMeBot(commands.Bot):
         if isinstance(error, commands.CommandNotFound):
             return
         logger.error(f"Erro no comando {ctx.command}: {error}")
-        await ctx.send(f"⚠️ Ocorreu um erro: {str(error)}")
+        message = f"⚠️ Ocorreu um erro: {str(error)}"
+        try:
+            # Tentar enviar via contexto normal (pode falhar se a interaction expirou)
+            await ctx.send(message)
+        except Exception as e_send:
+            logger.debug(f"Falha ao enviar resposta via interaction: {e_send}")
+            # Fallback: enviar diretamente no canal como mensagem padrão
+            try:
+                channel = getattr(ctx, 'channel', None)
+                if channel is not None and hasattr(channel, 'send'):
+                    await channel.send(message)
+                else:
+                    logger.error("Canal indisponível para enviar mensagem de erro ao usuário")
+            except Exception as e_chan:
+                logger.error(f"Falha ao enviar mensagem de erro via canal: {e_chan}")
 
 
 if __name__ == '__main__':

@@ -14,6 +14,34 @@ from discord.utils import sleep_until
 
 logger = logging.getLogger(__name__)
 
+
+async def safe_ctx_send(ctx, content=None, embed=None, view=None, ephemeral=False, **kwargs):
+    """Envia uma mensagem respeitando se o contexto veio de uma Interaction (defer/response/followup) ou de um Context tradicional.
+    Usa `interaction.response.send_message` quando possível, cai para `interaction.followup.send` se necessário,
+    e finalmente para `ctx.channel.send` como último recurso.
+    """
+    try:
+        inter = getattr(ctx, "interaction", None)
+        if inter is not None:
+            try:
+                await inter.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral, **kwargs)
+                return
+            except Exception as e_resp:
+                try:
+                    await inter.followup.send(content=content, embed=embed, view=view, ephemeral=ephemeral, **kwargs)
+                    return
+                except Exception as e_follow:
+                    logger.debug(f"safe_ctx_send: response/followup failed: {e_resp}; {e_follow}")
+
+        # Fallback para envio direto no canal (mensagem pública), se disponível
+        channel = getattr(ctx, "channel", None)
+        if channel is not None and hasattr(channel, "send"):
+            await channel.send(content=content, embed=embed, view=view, **kwargs)
+            return
+
+    except Exception as e:
+        logger.error(f"safe_ctx_send erro ao enviar mensagem: {e}")
+
 # --- Função utilitária para pegar hora de Brasília ---
 def get_brasilia_time():
     brasilia_offset = timedelta(hours=-3)
@@ -465,6 +493,12 @@ class DoarCommands(commands.Cog):
         Uso: /sim_doar [member] [amount] [nivel]
         """
         try:
+            # Acknowledge the command quickly to avoid Discord "Application did not respond" (3s timeout).
+            try:
+                await ctx.defer(ephemeral=True)
+            except Exception:
+                # defer may not be available in older contexts; ignore if it fails
+                pass
             target = member or ctx.author
             discord_id = str(target.id)
             if member and member.guild:
@@ -511,37 +545,54 @@ class DoarCommands(commands.Cog):
                 logger.error(f"Erro ao salvar simulação no banco: {e}")
                 apoiador = None
 
-            # Opcional: envie um webhook local para testar também o fluxo web
-            webhook_url = f"http://127.0.0.1:26173/kofi-webhook"
-            payload = {
-                "transaction_id": reference_id,
-                "type": "Donation",
-                "from_name": str(target),
-                "discord_id": discord_id,
-                "guild_id": guild_str,
-                "amount": f"{amount:.2f}",
-                "currency": "BRL",
-                "message": "Simulação de doação via comando sim_doar",
-                "email": None
-            }
-            # Inclui token de verificação se disponível
-            try:
-                token = app_config.KOFI_TOKEN
-            except Exception:
-                token = None
-            if token:
-                payload["verification_token"] = token
-            # Marca o webhook como teste — para que o handler trate duplicados
-            payload["is_test"] = True
-
+            # Opcional: envio do webhook local de simulação está desativado por padrão.
+            # Para reativar, defina a variável de ambiente `SIMULATE_WEBHOOK=true`.
             webhook_ok = False
-            try:
-                async with httpx.AsyncClient(timeout=10) as client:
-                    form = {"data": json.dumps(payload)}
-                    resp = await client.post(webhook_url, data=form)
-                    webhook_ok = resp.status_code == 200
-            except Exception as e:
-                logger.warning(f"Falha ao enviar webhook local de simulação: {e}")
+            if os.getenv("SIMULATE_WEBHOOK", "false").lower() == "true":
+                payload = {
+                    "transaction_id": reference_id,
+                    "type": "Donation",
+                    "from_name": str(target),
+                    "discord_id": discord_id,
+                    "guild_id": guild_str,
+                    "amount": f"{amount:.2f}",
+                    "currency": "BRL",
+                    "message": "Simulação de doação via comando sim_doar",
+                    "email": None
+                }
+                token = getattr(app_config, "KOFI_TOKEN", None)
+                if token:
+                    payload["verification_token"] = token
+                payload["is_test"] = True
+
+                # Tentar HTTP primeiro, depois HTTPS (com verify=False para permitir certificados locais/self-signed em dev).
+                urls_to_try = [
+                    "http://127.0.0.1:26173/kofi-webhook",
+                    "https://127.0.0.1:26173/kofi-webhook",
+                ]
+
+                form = {"data": json.dumps(payload)}
+                for url in urls_to_try:
+                    try:
+                        if url.startswith("https://"):
+                            # Permitir TLS inseguro aqui apenas para testes locais com certificados self-signed
+                            async with httpx.AsyncClient(timeout=10, verify=False) as client:
+                                resp = await client.post(url, data=form)
+                        else:
+                            async with httpx.AsyncClient(timeout=10) as client:
+                                resp = await client.post(url, data=form)
+
+                        status = getattr(resp, "status_code", None)
+                        logger.debug(f"Resposta do webhook de simulação {url}: {status}")
+                        if status == 200:
+                            webhook_ok = True
+                            break
+                    except Exception as e:
+                        logger.debug(f"Falha ao enviar webhook de simulação para {url}: {e}")
+                if not webhook_ok:
+                    logger.debug("Webhook local de simulação falhou em todos os endpoints tentados. Verifique se o servidor web está ativo e acessível (HTTP/HTTPS, porta 26173).")
+            else:
+                logger.debug("Envio de webhook local de simulação desativado (SIMULATE_WEBHOOK=false)")
             # Tenta atribuir cargo localmente também (lógica antiga), mas o webhook
             # receberá `is_test=True` para identificar que é uma simulação.
             guild_int = int(guild_str) if guild_str.isdigit() else 0
@@ -556,11 +607,11 @@ class DoarCommands(commands.Cog):
                 logger.error(f"Erro ao tentar atribuir cargo localmente na simulação: {e}")
                 success = False
 
-            await ctx.send(f"Simulação criada (ref {reference_id}). Atribuição de cargo: {'sucesso' if success else 'falha'}. Webhook enviado: {'ok' if webhook_ok else 'falhou'}")
+            await safe_ctx_send(ctx, f"Simulação criada (ref {reference_id}). Atribuição de cargo: {'sucesso' if success else 'falha'}. Webhook enviado: {'ok' if webhook_ok else 'falhou'}", ephemeral=True)
 
         except Exception as e:
             logger.error(f"Erro em sim_doar: {e}")
-            await ctx.send(f"❌ Erro ao simular doação: {e}")
+            await safe_ctx_send(ctx, f"❌ Erro ao simular doação: {e}", ephemeral=True)
 
 # --- Setup ---
 async def setup(bot):
