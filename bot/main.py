@@ -56,16 +56,16 @@ class HugMeBot(commands.Bot):
         self.web_thread = None
 
     def start_web_server(self):
-        """Schedule the uvicorn server to run in the bot's asyncio loop."""
-        # build absolute paths based on this source file so we don't depend on
-        # the process working directory (which in some deployment setups
-        # like Replit is `/home/container`).
+        """Agenda o servidor Uvicorn para rodar no loop asyncio do bot."""
+        # Constroi caminhos absolutos baseados neste arquivo fonte para não
+        # depender do diretório de trabalho do processo (em alguns ambientes
+        # de deploy, como o Replit, ele é `/home/container`).
         base_dir = os.path.abspath(os.path.dirname(__file__))
 
-        # compute potential certificate directories. the project normally keeps
-        # them under bot/certificates, but some hosting environments (e.g.
-        # the Replit container) provide them at /home/container/certificates.
-        # check each location and use the first that contains both files.
+        # Calcula diretórios potenciais de certificados. O projeto normalmente
+        # os mantém em bot/certificates, mas alguns ambientes de hospedagem
+        # (ex.: container do Replit) os fornecem em /home/container/certificates.
+        # Verifica cada local e usa o primeiro que contém ambos os arquivos.
         candidate_dirs = [
             os.path.join(base_dir, "certificates"),
             "/home/container/certificates",
@@ -82,9 +82,9 @@ class HugMeBot(commands.Bot):
                 logger.info(f"Usando certificados em {d}")
                 break
 
-        # if we didn't find them in any known location, error out.
+        # Se não os encontrarmos em nenhum local conhecido, gerar erro.
         if not ssl_certificate or not ssl_keyfile:
-            # report the list of places we looked for easier debugging
+            # Reporta a lista de locais verificados para facilitar o debug
             seen = ", ".join(candidate_dirs)
             raise FileNotFoundError(
                 f"Certificado ou chave SSL não encontrados em nenhum dos diretórios: {seen}"
@@ -100,14 +100,14 @@ class HugMeBot(commands.Bot):
                                     ssl_keyfile=ssl_keyfile
                                     )
             server = uvicorn.Server(config)
-            # Run server.serve() as a background task in the bot's event loop
+            # Executa server.serve() como tarefa em segundo plano no loop de eventos do bot
             import asyncio
             try:
                 loop = asyncio.get_running_loop()
                 loop.create_task(server.serve())
                 logger.info("Servidor web agendado no loop asyncio atual na porta 26173")
             except RuntimeError:
-                # No running loop; fallback to thread-based start
+                # Nenhum loop em execução; fallback para iniciar o servidor em uma thread
                 def run_web():
                     uvicorn.run("bot.web.main:app",
                                 host="0.0.0.0",

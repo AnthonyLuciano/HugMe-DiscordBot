@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    # Required core settings
+    # Configurações principais obrigatórias
     DISCORD_TOKEN = getenv('DISCORD_BOT_TOKEN')
     DATABASE_URL = getenv('DATABASE_URL')
     APPLICATION_ID = getenv('APPLICATION_ID')
@@ -15,17 +15,17 @@ class Config:
     DEEP_API = getenv('DEEP_API')
     DEEP_KEY = getenv('DEEP_KEY')
     
-    #Discord
+    # Discord
     QUARTO_DO_HUGME = getenv('QUARTO_DO_HUGME')
     APOIADOR_ID = getenv('APOIADOR_CARGO_ID')
     APOIADOR_ID2 = getenv('APOIADOR_CARGO_ID2')
     TEST_SERVER_ID = int(getenv('TEST_SERVER_ID', 0))
 
-    # Webhook and security settings
+    # Configurações de webhook e segurança
     WEBHOOK_SECRET = getenv('WEBHOOK_SECRET')
     ADMIN_TOKEN = getenv('ADMIN_TOKEN', '')
 
-    # Environment detection
+    # Detecção de ambiente
     USE_NGROK = getenv('USE_NGROK', 'false').lower() == 'true'
     NGROK_URL = getenv('NGROK_URL', '')
     FLY_URL = getenv('FLY_URL', '')

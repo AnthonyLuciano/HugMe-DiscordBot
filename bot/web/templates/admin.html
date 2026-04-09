@@ -4,45 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Admin</title>
-    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" href="./static/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="./static/css/style.css">
 </head>
 <body>
     <div class="container">
         <h1>Painel Administrativo</h1>
         
-        <div class="metricas">
-            <!-- Métricas existentes -->
-            <div class="metrica">
-                <h3>Total de Doações</h3>
-                <p>{{ metricas.total_donations }}</p>
-            </div>
-            <div class="metrica">
-                <h3>Apoiadores Ativos</h3>
-                <p>{{ metricas.active_supporters }}</p>
-            </div>
-            <div class="metrica">
-                <h3>Expirados</h3>
-                <p>{{ metricas.expired_supporters }}</p>
-            </div>
-            <div class="metrica">
-                <h3>Taxa de Renovação</h3>
-                <p>{{ metricas.renewal_rate }}%</p>
-            </div>
-            
-            <!-- Novas métricas -->
-            <div class="metrica warning">
-                <h3>Cargos Pendentes</h3>
-                <p>{{ metricas.pending_role_assignments }}</p>
-            </div>
-            <div class="metrica danger">
-                <h3>Falhas Webhook</h3>
-                <p>{{ metricas.webhook_failure_count }}</p>
-            </div>
+        <div class="metricas" id="metricas">
+            <!-- Metrics will be inserted here -->
         </div>
 
         <h2>Lista Completa de Apoiadores</h2>
-        <table>
+        <table id="apoiadoresTable">
             <thead>
                 <tr>
                     <th>ID Discord</th>
@@ -54,38 +28,8 @@
                     <th>Cargo Atribuído</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for apoiador in apoiadores %}
-                <tr>
-                    <td>{{ apoiador.discord_id }}</td>
-                    <td>{{ apoiador.guild_id }}</td>
-                    <td>{{ apoiador.tipo_apoio }}</td>
-                    <td class="status-{{ 'ativo' if apoiador.ativo else 'inativo' }}">
-                        {{ "Ativo" if apoiador.ativo else "Inativo" }}
-                    </td>
-                    <td>
-                        {% if apoiador.ultimo_pagamento %}
-                            {{ apoiador.ultimo_pagamento.strftime('%d/%m/%Y') }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if apoiador.data_expiracao %}
-                            {{ apoiador.data_expiracao.strftime('%d/%m/%Y') }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if apoiador.cargo_atribuido %}
-                            ✅ Sim
-                        {% else %}
-                            ❌ Não
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
+            <tbody id="apoiadoresBody">
+                <!-- Data will be inserted here -->
             </tbody>
         </table>
 
@@ -97,18 +41,117 @@
                 <input type="text" id="guild_id" name="guild_id" required>
             </div>
             <div id="levels">
-                {% for i in range(1,10) %}
                 <div>
-                    <label for="role_{{ i }}">Nível {{ i }} - ID do Cargo:</label>
-                    <input type="text" id="role_{{ i }}" name="role_{{ i }}">
+                    <label for="role_1">Nível 1 - ID do Cargo:</label>
+                    <input type="text" id="role_1" name="role_1">
                 </div>
-                {% endfor %}
+                <div>
+                    <label for="role_2">Nível 2 - ID do Cargo:</label>
+                    <input type="text" id="role_2" name="role_2">
+                </div>
+                <div>
+                    <label for="role_3">Nível 3 - ID do Cargo:</label>
+                    <input type="text" id="role_3" name="role_3">
+                </div>
+                <div>
+                    <label for="role_4">Nível 4 - ID do Cargo:</label>
+                    <input type="text" id="role_4" name="role_4">
+                </div>
+                <div>
+                    <label for="role_5">Nível 5 - ID do Cargo:</label>
+                    <input type="text" id="role_5" name="role_5">
+                </div>
+                <div>
+                    <label for="role_6">Nível 6 - ID do Cargo:</label>
+                    <input type="text" id="role_6" name="role_6">
+                </div>
+                <div>
+                    <label for="role_7">Nível 7 - ID do Cargo:</label>
+                    <input type="text" id="role_7" name="role_7">
+                </div>
+                <div>
+                    <label for="role_8">Nível 8 - ID do Cargo:</label>
+                    <input type="text" id="role_8" name="role_8">
+                </div>
+                <div>
+                    <label for="role_9">Nível 9 - ID do Cargo:</label>
+                    <input type="text" id="role_9" name="role_9">
+                </div>
             </div>
             <button type="submit">Salvar Configuração</button>
         </form>
     </div>
 
+    <script src="./static/js/script.js"></script>
     <script>
+        const API_BASE = 'https://your-api-domain.com';
+        const token = localStorage.getItem('access_token');
+        const adminToken = localStorage.getItem('admin_token') || prompt('Enter admin token:');
+
+        if (!token || !adminToken) {
+            window.location.href = './home.html';
+        }
+
+        async function loadAdmin() {
+            try {
+                const response = await fetch(`${API_BASE}/admin`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) throw new Error('Failed to load admin');
+                const data = await response.json();
+                
+                // Metrics
+                const metricasDiv = document.getElementById('metricas');
+                metricasDiv.innerHTML = `
+                    <div class="metrica">
+                        <h3>Total de Doações</h3>
+                        <p>${data.metricas.total_donations}</p>
+                    </div>
+                    <div class="metrica">
+                        <h3>Apoiadores Ativos</h3>
+                        <p>${data.metricas.active_supporters}</p>
+                    </div>
+                    <div class="metrica">
+                        <h3>Expirados</h3>
+                        <p>${data.metricas.expired_supporters}</p>
+                    </div>
+                    <div class="metrica">
+                        <h3>Taxa de Renovação</h3>
+                        <p>${data.metricas.renewal_rate}%</p>
+                    </div>
+                    <div class="metrica warning">
+                        <h3>Cargos Pendentes</h3>
+                        <p>${data.metricas.pending_role_assignments}</p>
+                    </div>
+                    <div class="metrica danger">
+                        <h3>Falhas Webhook</h3>
+                        <p>${data.metricas.webhook_failure_count}</p>
+                    </div>
+                `;
+
+                // Apoiadores table
+                const tbody = document.getElementById('apoiadoresBody');
+                data.apoiadores.forEach(apoiador => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${apoiador.discord_id}</td>
+                        <td>${apoiador.guild_id}</td>
+                        <td>${apoiador.tipo_apoio}</td>
+                        <td class="status-${apoiador.ativo ? 'ativo' : 'inativo'}">${apoiador.ativo ? 'Ativo' : 'Inativo'}</td>
+                        <td>${apoiador.ultimo_pagamento ? new Date(apoiador.ultimo_pagamento).toLocaleDateString('pt-BR') : '-'}</td>
+                        <td>${apoiador.data_expiracao ? new Date(apoiador.data_expiracao).toLocaleDateString('pt-BR') : '-'}</td>
+                        <td>${apoiador.cargo_atribuido ? '✅ Sim' : '❌ Não'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error(error);
+                alert('Erro ao carregar admin');
+            }
+        }
+
         document.getElementById('roleConfigForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const guildId = document.getElementById('guild_id').value;
@@ -120,18 +163,18 @@
             const formData = { guild_id: guildId, supporter_roles };
             
             try {
-                const response = await fetch('/admin/set-supporter-roles', {
+                const response = await fetch(`${API_BASE}/admin/set-supporter-roles`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': 'Bearer {{ app_config.ADMIN_TOKEN }}'
+                        'Authorization': `Bearer ${adminToken}`
                     },
                     body: JSON.stringify(formData)
                 });
                 
                 const result = await response.json();
                 if (response.ok) {
-                    alert(`Configuração salva! Servidor: ${result.guild_id}, Cargo: ${result.role_id}`);
+                    alert(`Configuração salva! Servidor: ${result.guild_id}`);
                 } else {
                     alert(`Erro: ${result.detail || 'Falha ao salvar configuração'}`);
                 }
@@ -140,6 +183,8 @@
                 alert('Erro na comunicação com o servidor');
             }
         });
+
+        loadAdmin();
     </script>
 </body>
 </html>

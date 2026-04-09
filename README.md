@@ -7,8 +7,16 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - Integração com comprovantes de doação via **PIX** e **cartão de crédito** para gerenciamento de apoios
 - Persistência das informações de apoiadores e doações em um banco **PostgreSQL**
 - Automatização da atribuição de cargos no Discord com base no tempo e nível de apoio
-- Painel web administrativo (futuramente) para gerenciamento e visualização dos dados
+- **Renovação automática** para assinaturas Ko-fi (sem intervenção manual!)
+- Painel web administrativo para gerenciamento e visualização dos dados
 - Suporte a pagamentos únicos e assinaturas recorrentes
+
+### Sistema de Doações:
+- **PIX**: Doação única com QR Code estático
+- **Ko-fi**: Assinatura mensal com renovação automática
+- **Webhook Ko-fi**: Detecta e processa renovações automaticamente
+- **Scheduler**: 3 funções coordenadas para garantir renovação perfeita
+- **Cargos**: Atribuição automática e reaplicação após renovação
 
 ## 🚧 Status do Projeto
 **Este projeto está em Desenvolvimento Ativo**
@@ -22,9 +30,46 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 
 ### Funcionalidades Gerais em andamento:
 
-- [ ] Implementar agendamentos para:
+- [x] Implementar agendamentos para:
   - [x] Verificação de expiração
-  - [ ] Atualização de cargos automaticamente
+  - [x] Atualização de cargos automaticamente (renovação Ko-fi)
+
+## 🔄 Sistema de Renovação Automática (NOVO!)
+
+### Como Funciona:
+O sistema agora tem **renovação automática** para apoiadores com assinatura Ko-fi:
+
+```
+DIA 30 (Expiração do mês):
+├─ check_expirations() → marca ativo=False
+└─ renovar_apoiadores_expirados() → reativa ativo=True, data_expiracao=+30d
+
+DIA 30 + 2h:
+└─ reativar_cargos_da_assinatura() → cargo reaplicado no Discord
+
+DIA 60 (Próxima expiração):
+└─ Ciclo se repete automaticamente (sem intervenção!)
+```
+
+### Fluxo Completo:
+1. **Webhook Ko-fi** detecta renovação (mensalmente)
+2. **Scheduler** reativa apoiadores expirados (a cada 12h)
+3. **Scheduler** reaplica cargo no Discord (a cada 2h)
+4. **Resultado**: Usuário tem cargo de volta automaticamente!
+
+### Benefícios:
+- ✅ Usuário não precisa reconfirmar a doação
+- ✅ Cargo volta automaticamente a cada renovação
+- ✅ Sistema rastreia histórico completo
+- ✅ Tudo funciona sem intervenção manual
+
+### Scheduler de Renovação:
+- **check_expirations()**: A cada 6 horas (detecta expiração)
+- **renovar_apoiadores_expirados()**: A cada 12 horas (reativa Ko-fi)
+- **reativar_cargos_da_assinatura()**: A cada 2 horas (reaplica cargo)
+
+### Documentação Completa:
+- [Sistema de Renovação](docs/sistema_renovacao.md) - Documentação detalhada
 
 ## 🎮 Sistema de RPG por Texto
 
@@ -46,17 +91,39 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
   - `/rpg_ajuda` - Tutorial manual
 
 ### Funcionalidades em Andamento:
-🦗🦗🦗🦗 nao tem nada mais por enquanto...
+🦗🦗🦗🦗 nada mais por enquanto...
+
+### Sistema de RPG por Texto (NOVO!)
+- **Integração DeepSeek**: API para geração de aventuras com contexto histórico
+- **Histórico Persistente**: Últimas 8 interações por desempenho
+- **Resumos Automáticos**: Para histórias longas
+- **Suporte a DMs**: Jogável em canais públicos ou privados
+- **Comandos Híbridos**: Slash commands + prefixo (slash e normal)
+- **Status Embed**: Visualização elegante do progresso
+- **Tutorial Interativo**: Guia para novos jogadores
+- **Gestão de Sessões**: Histórico mantido automaticamente
+- **Múltiplos Personagens**: Até 3 personagens por usuário
+- **Sistema de Personagens**: Criação com 6 atributos (1-20)
+
+### Funcionalidades em Andamento:
+🦗🦗🦗🦗 nada mais por enquanto...
 
 ### Tecnologias Utilizadas:
-- **Database**: MariaDB com SQLAlchemy ORM async
+- **Database**: PostgreSQL + SQLAlchemy ORM async
 - **API**: DeepSeek Chat para geração de conteúdo
 - **Framework**: discord.py com comandos híbridos
+- **Web**: FastAPI + uvicorn + Jinja2
+- **Agendamento**: APScheduler para tarefas periódicas
+- **Async**: asyncio, asyncpg, aiomysql
+- **Auth**: Authlib + OAuth2
+- **Webhook**: Ko-fi, PagBank, Discord Webhooks
 - **Armazenamento**: JSON em campos SQL para flexibilidade
 
 ### Arquitetura:
-- **Modelos**: `RPGSession` (sessões), `RPGCharacter` (personagens)
+- **Modelos**: `RPGSession` (sessões), `RPGCharacter` (personagens), `Apoiador` (doações)
 - **Engine Async**: Operações não-bloqueantes para melhor performance
+- **Scheduler**: 3 funções coordenadas para renovação automática
+- **Webhook**: Ko-fi detecta renovações, reativa e reaplica cargo
 - **Cache Inteligente**: Histórico mantido em memória com persistência automática
 - **Tratamento de Erros**: Sistema robusto com fallbacks amigáveis
 
@@ -70,10 +137,14 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 
 - [ ] Adicionar painel com histórico e logs
 - [ ] Documentar API para integrações externas
+- [ ] Melhorar UX do painel web
+- [ ] Adicionar relatórios avançados
 
 ## 🏁 Etapa Final
 - [x] Testes completos no ambiente real
 - [x] Migrar o bot para ambiente de produção
+- [x] Implementar renovação automática de assinaturas Ko-fi
+- [x] Documentar sistema completo
 
 ## 🛠 Tecnologias Utilizadas
 - [Python 3.12+](https://www.python.org/)
@@ -83,6 +154,9 @@ O HugMe é uma aplicação backend escrita em **Python**, que oferece:
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [httpx](https://www.python-httpx.org/)
 - [asyncio](https://docs.python.org/3/library/asyncio.html)
+- [APScheduler](https://apscheduler.readthedocs.io/) - Agendamento de tarefas
+- [Authlib](https://authlib.org/) - OAuth2
+- [Jinja2](https://jinja.palletsprojects.com/) - Templates
 - [BlazeHosting](https://blazehosting.com.br/bots) *(hospedagem do bot e painel, bem recomendado)*
 
 ## 📬 Contato

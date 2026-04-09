@@ -20,10 +20,10 @@ class VerificacaoMembro:
     async def tempo_servidor(self, member: discord.Member) -> str:
         """Calcula o tempo de permanência de um membro no servidor e retorna uma string formatada.
 
-        Args:
+        Parâmetros:
             member (discord.Member): O membro do Discord a ser verificado.
 
-        Returns:
+        Retorno:
             str: String formatada com o tempo de permanência (ex: "1 ano, 2 meses, 3 dias").
         """
         agora = datetime.now(timezone.utc)
@@ -61,10 +61,10 @@ class VerificacaoMembro:
     async def obter_guild_id(self, member: discord.Member) -> int:
         """Obtém o ID do servidor (guild) a partir do objeto member.
 
-        Args:
+        Parâmetros:
             member (discord.Member): O membro do Discord.
 
-        Returns:
+        Retorno:
             int: ID do servidor.
         """
         return member.guild.id
@@ -72,11 +72,11 @@ class VerificacaoMembro:
     async def verificar_tempo_minimo(self, member: discord.Member, tempo_minimo_dias: int) -> bool:
         """Verifica se o membro tem o tempo mínimo necessário no servidor.
         
-        Args:
+        Parâmetros:
             member: O membro a verificar
             tempo_minimo_dias: Tempo mínimo em dias
             
-        Returns:
+        Retorno:
             bool: True se atender ao requisito
         """
         if member.joined_at is None:

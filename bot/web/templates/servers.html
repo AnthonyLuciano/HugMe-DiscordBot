@@ -4,23 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Servidores</title>
-    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" href="./static/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="./static/css/style.css">
 </head>
 <body>
     <div class="container">
         <h1>Servidores</h1>
         <p>Lista de servidores onde você tem permissões administrativas:</p>
-        <ul>
-            {% for guild in guilds %}
-            <li>
-                <strong>{{ guild.name }}</strong> (ID: {{ guild.id }})
-                {% if guild.is_admin %}  <!-- Verifica permissão de administrador -->
-                    <span class="badge">Admin</span>
-                {% endif %}
-            </li>
-            {% endfor %}
+        <ul id="guildsList">
+            <!-- Guilds will be inserted here -->
         </ul>
     </div>
+    <script src="./static/js/script.js"></script>
+    <script>
+        const API_BASE = 'https://your-api-domain.com';
+        const token = localStorage.getItem('access_token');
+
+        if (!token) {
+            window.location.href = './home.html';
+        }
+
+        async function loadServers() {
+            try {
+                const response = await fetch(`${API_BASE}/servers`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) throw new Error('Failed to load servers');
+                const data = await response.json();
+                const ul = document.getElementById('guildsList');
+                data.guilds.forEach(guild => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>${guild.name}</strong> (ID: ${guild.id})`;
+                    ul.appendChild(li);
+                });
+            } catch (error) {
+                console.error(error);
+                alert('Erro ao carregar servidores');
+            }
+        }
+
+        loadServers();
+    </script>
 </body>
 </html>

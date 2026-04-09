@@ -1,0 +1,59 @@
+# Arquivos de teste
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+ENV/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Relatórios
+htmlcov/
+.coverage
+*.cover
+.pytest_cache/
+.tox/
+
+# Banco de dados de teste
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Arquivos grandes ou gerados
+*.zip
+*.tar.gz
+*.rar
+
+# Arquivos de ambiente sensíveis
+.env
+.env.local
+.env.*.local
+
+# Arquivos de build
+build/
+dist/
+*.egg-info/
+
+# Arquivos de documentação (opcional)
+# docs/_build/
+
+# Arquivos de exemplo (opcional)
+# examples/
+
+# Arquivos de configuração sensível (opcional)
+# config/secrets.*

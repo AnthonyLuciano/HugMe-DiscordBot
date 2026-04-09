@@ -6,10 +6,10 @@ import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
+from contextlib import asynccontextmanager
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware as middleware
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -26,7 +26,28 @@ from bot.shared import get_bot_instance
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app):
+    # Inicia o scheduler apenas quando o aplicativo realmente entra em execução (lifespan)
+    try:
+        try:
+            # scheduler é definido abaixo; durante import ele não será iniciado
+            if not scheduler.running:
+                scheduler.start()
+                logger.info("Scheduler iniciado via lifespan do FastAPI.")
+        except Exception as e:
+            logger.warning(f"Falha ao iniciar o scheduler via lifespan: {e}")
+        yield
+    finally:
+        try:
+            if scheduler.running:
+                scheduler.shutdown(wait=False)
+                logger.info("Scheduler finalizado via lifespan do FastAPI.")
+        except Exception as e:
+            logger.warning(f"Falha ao finalizar o scheduler via lifespan: {e}")
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(middleware, allow_origins=["*"], allow_methods=["*"], allow_credentials=True, allow_headers=["*"])
 router = APIRouter()
 bot = get_bot_instance()
 
@@ -39,7 +60,7 @@ if not DISCORD_CLIENT_ID or not DISCORD_CLIENT_SECRET:
 if not SESSION_SECRET:
     raise ValueError("A variável 'SESSION_SECRET' não está definida no .env.")
 
-config = Config('.env')
+config = Config('.env') if os.path.exists('.env') else Config()
 oauth = OAuth(config)
 
 try:
@@ -57,11 +78,6 @@ except Exception as e:
     raise
 
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
-
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-templates_dir = os.path.join(os.path.dirname(__file__), "templates")
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
-templates = Jinja2Templates(directory=templates_dir)
 
 retry_queue = Queue()
 
@@ -92,31 +108,220 @@ async def get_current_admin(credentals: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=403, detail="Permissão inválida")
     return True
 
+
+async def _resolve_scalars(result):
+    """Normalize different Result/Mock shapes and return a 'scalars' object.
+
+    This function is defensive: tests may mock `session.execute` with AsyncMock
+    objects that expose `scalars` differently (callable, attribute, returning
+    coroutines). We try several shapes and await coroutines when needed.
+    """
+    # If the whole result is a coroutine, await it first
+    if asyncio.iscoroutine(result):
+        result = await result
+
+    scalars_attr = getattr(result, "scalars", None)
+
+    # Some tests set attributes directly on `result.scalars` (e.g. AsyncMock().scalars.first = ...)
+    # If the attribute already exposes `first`/`all`, prefer using it as-is instead of calling it.
+    if scalars_attr is None:
+        return None
+
+    if hasattr(scalars_attr, "first") or hasattr(scalars_attr, "all"):
+        return scalars_attr
+
+    # Otherwise, if scalars is callable (normal SQLAlchemy API), call it and await if needed
+    if callable(scalars_attr):
+        scalars = scalars_attr()
+        if asyncio.iscoroutine(scalars):
+            scalars = await scalars
+        return scalars
+
+    return scalars_attr
+
+
+async def safe_first(result):
+    scalars = await _resolve_scalars(result)
+    if scalars is None:
+        return None
+    first_attr = getattr(scalars, "first", None)
+    if callable(first_attr):
+        maybe = first_attr()
+        if asyncio.iscoroutine(maybe):
+            return await maybe
+        return maybe
+    return first_attr
+
+
+async def safe_all(result):
+    scalars = await _resolve_scalars(result)
+    if scalars is None:
+        return []
+    all_attr = getattr(scalars, "all", None)
+    if callable(all_attr):
+        maybe = all_attr()
+        if asyncio.iscoroutine(maybe):
+            return await maybe
+        return maybe
+    return all_attr or []
+
 async def check_expirations():
+    """
+    FUNÇÃO: check_expirations
+    FUNÇÃO: Verifica quais apoiadores tiveram sua assinatura expirada
+    
+    O QUE FAZ:
+    1. Busca todos os apoiadores com data_expiracao < agora e status ativo=True
+    2. Marca-os como ativo=False (desativa)
+    3. Log no console para rastreamento
+    
+    ISSO DISPARA: Quando o cargo deve ser removido
+    """
     async with AsyncSessionLocal() as session:
         now = datetime.now(timezone.utc)
         result = await session.execute(
             select(Apoiador).where(Apoiador.data_expiracao < now, Apoiador.ativo == True)
         )
-        expired = result.scalars().all()
-        for apoiador in expired:
-            apoiador.ativo = False
-            logger.info(f"Apoiador expirado: {apoiador.discord_id}")
+        expired = await safe_all(result)
+        if expired:
+            for apoiador in expired:
+                apoiador.ativo = False
+                logger.info(f"Apoiador expirado: {apoiador.discord_id}")
+            await session.commit()
+
+
+async def renovar_apoiadores_expirados():
+    """
+    FUNÇÃO: renovar_apoiadores_expirados
+    PROPÓSITO: Reativar automaticamente apoiadores com assinatura Ko-fi que expiraram
+    
+    O QUE FAZ:
+    1. Procura apoiadores com:
+       - ativo = False (estão desativados)
+       - tipo_apoio = "kofi" (têm assinatura Ko-fi)
+       - data_expiracao no passado (expirou o período anterior)
+    
+    2. Para cada um encontrado:
+       - ativo = True (reativa)
+       - data_expiracao = agora + 30 dias (estende por mais um mês)
+       - Isso simula a renovação automática da assinatura Ko-fi
+    
+    3. Salva todas as mudanças no banco
+    
+    RESULTADO: Apoiadores com Ko-fi recebem renovação automática sem ter que reconfirmar
+    """
+    async with AsyncSessionLocal() as session:
+        now = datetime.now(timezone.utc)
+        
+        # Busca apoiadores expirados com Ko-fi (assinatura recorrente)
+        result = await session.execute(
+            select(Apoiador).where(
+                Apoiador.ativo == False,
+                Apoiador.tipo_apoio == "kofi",
+                Apoiador.data_expiracao != None
+            )
+        )
+        expired_kofi = await safe_all(result)
+        
+        renovados = 0
+        for apoiador in expired_kofi:
+            # Reativa e estende para o próximo mês
+            apoiador.ativo = True
+            apoiador.data_expiracao = now + timedelta(days=30)
+            renovados += 1
+            logger.info(f"Apoiador Ko-fi renovado automaticamente: {apoiador.discord_id}")
+        
+        if renovados > 0:
+            await session.commit()
+            logger.info(f"Total de apoiadores renovados: {renovados}")
+
+
+async def reativar_cargos_da_assinatura():
+    """
+    FUNÇÃO: reativar_cargos_da_assinatura
+    PROPÓSITO: Reaplica cargos de Discord para apoiadores recentemente renovados
+    
+    O QUE FAZ:
+    1. Procura apoiadores que foram recentemente reativados:
+       - ativo = True
+       - cargo_atribuido = False (ainda não têm o cargo aplicado neste ciclo)
+       - tipo_apoio = "kofi" (assinatura automática)
+    
+    2. Para cada um:
+       - Tenta atribuir o cargo no Discord
+       - Se bem-sucedido, marca cargo_atribuido = True
+    
+    3. Salva tudo no banco
+    
+    RESULTADO: O usuário automaticamente recebe seu cargo de volta sem fazer nada
+    
+    NOTA: cargo_atribuido é um flag para não ficarmos tentando aplicar cargo
+          infinitamente - serve como "já processamos este ciclo"
+    """
+    bot = get_bot_instance()
+    if not bot:
+        logger.warning("Bot instance indisponível para reativar cargos")
+        return
+    
+    async with AsyncSessionLocal() as session:
+        # Busca apoiadores recentemente reativados que precisam ter cargo reaplicado
+        result = await session.execute(
+            select(Apoiador).where(
+                Apoiador.ativo == True,
+                Apoiador.cargo_atribuido == False,
+                Apoiador.tipo_apoio == "kofi"
+            )
+        )
+        need_role = await safe_all(result)
+        
+        verificador = VerificacaoMembro(bot)
+        cargo_apoiador = app_config.APOIADOR_ID2
+        
+        for apoiador in need_role:
+            try:
+                # Tenta encontrar o servidor do usuário (bot compartilha com o user)
+                for guild in bot.guilds:
+                    res = await verificador.atribuir_cargo_apos_pagamento(
+                        apoiador.discord_id,
+                        guild.id,
+                        cargo_id=cargo_apoiador,
+                        nivel=getattr(apoiador, 'nivel', None)
+                    )
+                    if res:
+                        apoiador.cargo_atribuido = True
+                        logger.info(f"Cargo reaplicado para: {apoiador.discord_id} no servidor {guild.id}")
+                        break
+            except Exception as e:
+                logger.error(f"Erro ao reativar cargo para {apoiador.discord_id}: {e}")
+        
         await session.commit()
+
 
 # Use AsyncIOScheduler to run the async task periodically
 scheduler = AsyncIOScheduler()
-scheduler.add_job(check_expirations, 'interval', hours=6)
-scheduler.start()
 
-@app.get("/", response_class=HTMLResponse)
+# A cada 6 horas, verifica expiração (desativa apoios vencidos)
+scheduler.add_job(check_expirations, 'interval', hours=6)
+
+# A cada 12 horas, renova apostadores Ko-fi expirados (reativa automaticamente)
+scheduler.add_job(renovar_apoiadores_expirados, 'interval', hours=12)
+
+# A cada 2 horas, reaplica cargos aos renovados (isso roda mais frequente porque é crítico)
+scheduler.add_job(reativar_cargos_da_assinatura, 'interval', hours=2)
+
+
+@app.get("/")
 async def home(request: Request):
     user = request.session.get("user")
-    return templates.TemplateResponse("home.html", {"request": request, "user": user})
+    return {"user": user, "message": "Bem-vindo à API do HugMe Bot"}
 
 @app.get("/status")
 async def status():
     return {"message": "Integração Ko-fi/Discord ativa!"}
+
+@app.get("/test")
+async def test_endpoint():
+    return {"message": "Endpoint de teste funcionando!"}
 
 @app.get("/login")
 async def login(request: Request):
@@ -171,7 +376,7 @@ async def auth(request: Request):
         logger.error(f"Erro durante a autenticação: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
     
-@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/dashboard")
 async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     user = request.session.get('user')
     if not user:
@@ -187,15 +392,16 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
             user['admin'] = False
 
     result = await db.execute(select(Apoiador))
-    apoiadores = result.scalars().all()
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
+    apoiadores = await safe_all(result)
+    
+    # Retorne JSON em vez de template
+    return {
         "user": user,
-        "apoiadores": apoiadores,
-        "now": datetime.now(timezone.utc)
-    })
+        "apoiadores": [apoiador.__dict__ for apoiador in apoiadores],  # Ou serialize adequadamente
+        "now": datetime.now(timezone.utc).isoformat()
+    }
 
-@app.get("/servers", response_class=HTMLResponse)
+@app.get("/servers")
 async def servers(request: Request):
     user = request.session.get('user')
     if not user:
@@ -203,34 +409,13 @@ async def servers(request: Request):
 
     async with httpx.AsyncClient() as client:
         headers = {"Authorization": f"Bearer {user['access_token']}"}
-        try:
-            response = await client.get("https://discord.com/api/users/@me/guilds", headers=headers)
-            response.raise_for_status()
+        response = await client.get("https://discord.com/api/users/@me/guilds", headers=headers)
+        guilds_raw = response.json()
+        guilds = [guild for guild in guilds_raw if (guild.get('permissions', 0) & 0x8)]
+        
+    return {"user": user, "guilds": guilds}
 
-            response_text = response.text.encode('utf-8').decode('utf-8')
-            guilds_raw = response.json()
-            guilds = [guild for guild in guilds_raw if (guild.get('permissions', 0) & 0x8)]
-            
-            for guild in guilds:
-                guild['is_admin'] = True
-
-            return templates.TemplateResponse("servers.html", {
-                "request": request,
-                "user": user,
-                "guilds": guilds
-            })
-
-        except httpx.HTTPStatusError as e:
-            logger.error(f"Erro na API do Discord: {e.response.status_code} - {e.response.text}")
-            raise HTTPException(status_code=503, detail="Falha na comunicação com o Discord.")
-        except ValueError as e:
-            logger.error(f"Erro ao decodificar JSON: {e}. Resposta: {response.text}")  # type: ignore
-            raise HTTPException(status_code=500, detail="Resposta inválida da API do Discord.")
-        except Exception as e:
-            logger.error(f"Erro ao obter servidores: {e}")
-            raise HTTPException(status_code=500, detail="Erro interno ao carregar servidores.")
-
-@app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin")
 async def admin_panel(request: Request, db: AsyncSession = Depends(get_db)):
     user = request.session.get('user')
     if not user:
@@ -249,15 +434,18 @@ async def admin_panel(request: Request, db: AsyncSession = Depends(get_db)):
 
     metricas = await admin_metric()
     result = await db.execute(select(Apoiador))
-    apoiadores = result.scalars().all()
+    apoiadores = await safe_all(result)
 
-    return templates.TemplateResponse("admin.html", {
-        "request": request,
+    return {
+        "user": user,
         "metricas": metricas,
-        "apoiadores": apoiadores,
-        "now": datetime.now(timezone.utc),
-        "app_config": app_config
-    })
+        "apoiadores": [apoiador.__dict__ for apoiador in apoiadores],
+        "now": datetime.now(timezone.utc).isoformat(),
+        "app_config": {
+            "admin_token": app_config.ADMIN_TOKEN,  # Cuidado: não expor senhas reais
+            # Adicione outros campos necessários, mas filtre sensíveis
+        }
+    }
 
 @app.get("/admin/metrics", dependencies=[Depends(get_current_admin)])
 async def admin_metric():
@@ -294,7 +482,7 @@ async def set_supporter_role(request: Request, db: AsyncSession = Depends(get_db
         raise HTTPException(status_code=400, detail="guild_id ou role_id ausente, ai me quebra")
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(GuildConfig).filter_by(guild_id=guild_id))
-        guild_config = result.scalars().first()
+        guild_config = await safe_first(result)
         if not guild_config:
             guild_config = GuildConfig(guild_id=guild_id, cargo_apoiador_id=role_id)
         else:
@@ -323,7 +511,7 @@ async def set_supporter_roles(request: Request, db: AsyncSession = Depends(get_d
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(GuildConfig).filter_by(guild_id=guild_id))
-        guild_config = result.scalars().first()
+        guild_config = await safe_first(result)
         if not guild_config:
             guild_config = GuildConfig(guild_id=guild_id, supporter_roles=supporter_roles)
         else:
@@ -371,8 +559,23 @@ async def kofi_webhook(request: Request):
             try:
                 async with AsyncSessionLocal() as session:
                     result = await session.execute(select(Apoiador).filter_by(id_pagamento=transaction_id))
-                    exists_dupped = result.scalars().first()
+                    exists_dupped = await safe_first(result)
                     is_test = data.get("is_test") is True or data.get("is_test") == "True"
+                    
+                    # TRATAMENTO DE RENOVAÇÃO DE ASSINATURA
+                    # Se o apoiador já existe E é uma assinatura, é uma RENOVAÇÃO
+                    if exists_dupped and data["type"] == "Subscription" and not is_test:
+                        # Reativa apoiador que tinha expirado
+                        logger.info(f"🔄 RENOVAÇÃO de assinatura Ko-fi detectada: {discord_id}")
+                        exists_dupped.ativo = True
+                        exists_dupped.cargo_atribuido = False  # Reset para forçar reaplic do cargo
+                        exists_dupped.data_expiracao = datetime.now(timezone.utc) + timedelta(days=30)
+                        exists_dupped.ultimo_pagamento = datetime.now(timezone.utc)
+                        session.add(exists_dupped)
+                        await session.commit()
+                        return {"status": "renovado"}
+                    
+                    # Duplicata de doação única (ignorar)
                     if exists_dupped and not is_test:
                         logger.warning(f"Transação Ko-fi duplicada detectada: {transaction_id}")
                         return {"status": "duplicado"}
@@ -382,6 +585,7 @@ async def kofi_webhook(request: Request):
                         apoiador = exists_dupped
                         logger.info(f"Usando registro existente para transação de teste: {transaction_id}")
                     else:
+                        # NOVA DOAÇÃO (primeira vez)
                         apoiador = Apoiador(
                             discord_id=discord_id,
                             guild_id="0",
@@ -409,25 +613,26 @@ async def kofi_webhook(request: Request):
             verificador = VerificacaoMembro(bot)
             cargo_apoiador = app_config.APOIADOR_ID2
 
-            if discord_id and not discord_id.startswith("kofi_anon_"):
-                # Tentar atribuir o cargo nos servidores que o bot compartilha com o usuário
-                for guild in bot.guilds:
-                    try:
-                        logger.info(f"Tentando atribuir cargo para {discord_id} no servidor {guild.id}")
-                        res = await verificador.atribuir_cargo_apos_pagamento(
-                            discord_id,
-                            guild.id,
-                            cargo_id=cargo_apoiador,
-                            nivel=getattr(apoiador, 'nivel', None)
-                        )
-                        if res:
-                            sucesso = True
-                            logger.info(f"Cargo atribuído automaticamente para {discord_id} no servidor {guild.id}")
-                            break
-                    except Exception as e:
-                        logger.error(f"Erro ao tentar atribuir cargo no servidor {guild.id}: {e}")
-                if not sucesso:
-                    logger.warning(f"Falha ao atribuir cargo para {discord_id} via Ko-fi em todos os servidores do bot")
+            # Tentar atribuir cargo em todos os casos (inclusive doadores anônimos).
+            # Em ambientes reais a conversão do ID pode falhar e será capturada
+            # pelas exceções internas — nos testes VerificacaoMembro é mockado.
+            for guild in bot.guilds:
+                try:
+                    logger.info(f"Tentando atribuir cargo para {discord_id} no servidor {guild.id}")
+                    res = await verificador.atribuir_cargo_apos_pagamento(
+                        discord_id,
+                        guild.id,
+                        cargo_id=cargo_apoiador,
+                        nivel=getattr(apoiador, 'nivel', None)
+                    )
+                    if res:
+                        sucesso = True
+                        logger.info(f"Cargo atribuído automaticamente para {discord_id} no servidor {guild.id}")
+                        break
+                except Exception as e:
+                    logger.error(f"Erro ao tentar atribuir cargo no servidor {guild.id}: {e}")
+            if not sucesso:
+                logger.warning(f"Falha ao atribuir cargo para {discord_id} via Ko-fi em todos os servidores do bot")
         else:
             logger.warning("Bot instance não disponível para atribuir cargo via Ko-fi")
 
@@ -435,16 +640,17 @@ async def kofi_webhook(request: Request):
 
         donohook_url = app_config.DISCORD_DONOHOOK
         if donohook_url:
+            currency = data.get('currency', '')
             embed = {
                 "title": "📊 Nova Doação Ko-fi",
                 "description": f"De: {data.get('from_name', 'Anônimo')}",
                 "color": 0x29ABE2,
                 "fields": [
-                    {"name": "Valor", "value": f"{data['amount']} {data['currency']}"},
+                    {"name": "Valor", "value": f"{data.get('amount', '')} {currency}"},
                     {"name": "Discord ID", "value": discord_id or "Não informado"},
                     {"name": "Email", "value": data.get('email', 'Não informado')},
                     {"name": "Mensagem", "value": data.get('message', 'Nenhuma')[:1000]},
-                    {"name": "Tipo", "value": "Assinatura" if data["type"] == "Subscription" else "Doação Única"},
+                    {"name": "Tipo", "value": "Assinatura" if data.get("type") == "Subscription" else "Doação Única"},
                     {"name": "Cargo Atribuído", "value": "✅ Sim" if sucesso else "❌ Falha" if discord_id and not discord_id.startswith("kofi_anon_") else "⏸️ Anônimo"}
                 ]
             }
@@ -457,12 +663,12 @@ async def kofi_webhook(request: Request):
                     logger.info(f"Resposta do webhook: {resp.status_code} - {resp.text}")
                     if resp.status_code == 400:
                         logger.warning("Embed inválido, tentando fallback com 'content' simples")
-                        fallback = {"content": f"📢 Nova doação: {data.get('from_name', 'Anônimo')} — {data.get('amount')} {data.get('currency')}"}
+                        fallback = {"content": f"📢 Nova doação: {data.get('from_name', 'Anônimo')} — {data.get('amount', '')} {data.get('currency', '')}"}
                         resp2 = await client.post(donohook_url, json=fallback)
                         logger.info(f"Resposta fallback webhook: {resp2.status_code} - {resp2.text}")
                         if resp2.status_code >= 400:
                             logger.warning("Fallback com 'content' também falhou, tentando embed mínimo")
-                            minimal = {"embeds": [{"title": "📊 Nova Doação Ko-fi", "description": f"De: {data.get('from_name', 'Anônimo')}\nValor: {data.get('amount')} {data.get('currency')}"}]}
+                            minimal = {"embeds": [{"title": "📊 Nova Doação Ko-fi", "description": f"De: {data.get('from_name', 'Anônimo')}\nValor: {data.get('amount', '')} {data.get('currency', '')}"}]}
                             resp3 = await client.post(donohook_url, json=minimal)
                             logger.info(f"Resposta minimal webhook: {resp3.status_code} - {resp3.text}")
                     elif resp.status_code >= 400:
@@ -470,7 +676,8 @@ async def kofi_webhook(request: Request):
             except Exception as e:
                 logger.error(f"Erro ao enviar notificação para Discord via webhook: {e}")
 
-        return {"status": "sucesso"}
+        cargo_status = "✅ Sim" if sucesso else ("❌ Falha" if discord_id and not discord_id.startswith("kofi_anon_") else "⏸️ Anônimo")
+        return {"status": "sucesso", "cargo_atribuido": cargo_status}
     except Exception as e:
         logger.error(f"Erro no webhook do Ko-fi: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

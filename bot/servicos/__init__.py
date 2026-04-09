@@ -1,4 +1,4 @@
-# File: /discord-donation-bot/discord-donation-bot/bot/pagbank/__init__.py
+# Arquivo: bot/servicos (interfaces com serviços de pagamento)
 
 # Este arquivo será responsável por interações com a API do PagBank.
 # Aqui, você pode definir funções para criar e verificar transações.
