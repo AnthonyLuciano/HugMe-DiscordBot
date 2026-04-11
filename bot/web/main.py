@@ -373,7 +373,10 @@ async def auth(request: Request):
             'refresh_token': token.get('refresh_token')                           
         }
         logger.info("Autenticação concluída com sucesso.")
-        return RedirectResponse(url='/dashboard')
+        
+        # Redirecionar para o frontend com o token na URL
+        frontend_url = f"https://developer.hugmebot.online/static-bot-panel/pages/dashboard.html?token={token['access_token']}"
+        return RedirectResponse(url=frontend_url)
 
     except httpx.HTTPStatusError as e:
         logger.error(f"Erro na API do Discord: {e.response.status_code} - {e.response.text}")
