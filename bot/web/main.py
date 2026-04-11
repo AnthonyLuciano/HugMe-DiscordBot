@@ -47,7 +47,13 @@ async def lifespan(app):
             logger.warning(f"Falha ao finalizar o scheduler via lifespan: {e}")
 
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(middleware, allow_origins=["*"], allow_methods=["*"], allow_credentials=True, allow_headers=["*"])
+app.add_middleware(
+    middleware,
+    allow_origins=["https://developer.hugmebot.online"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_credentials=True,
+    allow_headers=["*"]
+)
 router = APIRouter()
 bot = get_bot_instance()
 

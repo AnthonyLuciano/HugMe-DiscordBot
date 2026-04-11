@@ -14,3 +14,4 @@ hugme/bot/commands/__pycache__/__init__.cpython-313.pyc
 .env
 /bot/certificates
 /bot/web/local_test
+/frontend
