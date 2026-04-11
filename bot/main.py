@@ -9,6 +9,7 @@ from bot.database import Base, engine, AsyncSessionLocal
 from bot.database.models import Apoiador
 from bot.shared import set_bot_instance
 from sqlalchemy import select
+from bot.database import close_db
 
 # Configuração básica de logging
 logging.basicConfig(
@@ -170,6 +171,11 @@ class HugMeBot(commands.Bot):
                     logger.error("Canal indisponível para enviar mensagem de erro ao usuário")
             except Exception as e_chan:
                 logger.error(f"Falha ao enviar mensagem de erro via canal: {e_chan}")
+    
+    async def close(self):
+        """Encerra o engine do banco antes de fechar o bot."""
+        await close_db()
+        await super().close()
 
 
 if __name__ == '__main__':
