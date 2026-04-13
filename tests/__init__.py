@@ -1,1 +1,1 @@
-# Testes do HugMe Bot
+# Tests package
