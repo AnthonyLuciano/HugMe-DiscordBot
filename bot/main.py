@@ -138,10 +138,22 @@ class HugMeBot(commands.Bot):
                     except Exception as e:
                         logger.error(f"Erro ao carregar cog {filename}: {e}")
 
-            self.start_web_server()
+            # Tenta iniciar servidor web (não deve falhar o setup_hook se falhar)
+            try:
+                self.start_web_server()
+            except Exception as e:
+                logger.error(f"Erro ao iniciar servidor web: {e}")
+                logger.error("O bot continuará funcionando sem o servidor web")
+
             # Sincroniza comandos slash
-            await self.tree.sync()
-            logger.info("Comandos slash sincronizados")
+            try:
+                synced = await self.tree.sync()
+                logger.info(f"Comandos slash sincronizados: {len(synced)} comandos")
+                for cmd in synced:
+                    logger.info(f"  - /{cmd.name}: {cmd.description}")
+            except Exception as e:
+                logger.error(f"Erro ao sincronizar comandos slash: {e}")
+                logger.error("Verifique se o bot tem permissão 'applications.commands' no servidor")
         except Exception as e:
             logger.error(f"Erro ao carregar extensões/setup_hook: {e}")
 

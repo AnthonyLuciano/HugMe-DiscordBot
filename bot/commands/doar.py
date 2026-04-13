@@ -180,7 +180,7 @@ class DonationModal(Modal, title="Fazer Doação via Pix"):
                     "✅ Verifique sua DM para completar a doação.", ephemeral=True
                 )
             except discord.Forbidden:
-                await interaction.response.send_message(embed=embed, view=user_view, ephemeral=False)
+                await interaction.response.send_message(embed=embed, view=user_view, ephemeral=True)
                 bot_message = None
                 user_message = await interaction.original_response()
 
