@@ -13,10 +13,11 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - Melhor proteção contra conteúdo sensível no chat DeepSeek
 
 ### 🐛 Correções
-- **Erro Crítico de Importação**: Resolvidos problemas de inicialização do bot
-  - Criado `bot/database/__init__.py` com configurações SQLAlchemy corretas
+- **Erro Crítico de Importação**: Resolvidos problemas de inicialização do bot e servidor web
+  - Criado `bot/database/__init__.py` com configurações SQLAlchemy completas (síncrono e assíncrono)
+  - Adicionadas `SessionLocal` e `get_db` para compatibilidade com FastAPI
   - Corrigido uso incorreto de `discord.select` para `sqlalchemy.select` em `main.py`
-  - Bot agora inicializa sem erros de importação
+  - Bot e servidor web agora inicializam sem erros de importação
 
 ---
 
