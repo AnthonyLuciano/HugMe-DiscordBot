@@ -24,7 +24,8 @@ SENSITIVE_KEYWORDS = [
 
 CRISIS_KEYWORDS = [
     "suicídio", "suicidio", "me matar", "quero morrer", "não quero mais viver",
-    "nao quero mais viver", "me machucar", "automutilação", "autolesão"
+    "nao quero mais viver", "me machucar", "automutilação", "autolesão",
+    "tortura", "torturar", "torturado", "torturada", "me torturar", "torturando"
 ]
 
 SAFEGUARD_REMINDER_INTERVAL = 5  # A cada X mensagens, lembra que não é terapeuta
