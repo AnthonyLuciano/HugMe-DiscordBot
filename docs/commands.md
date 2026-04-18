@@ -55,10 +55,16 @@
 ### 🔐 Admin (`admin.py`)
 - **Comandos Privilegiados**:
   - `/set_qrcode [url]`: Atualiza QR Code PIX
+  - `/manage_supporter`: Gerencia apoiadores manualmente
   - `/verificarcargo [cargo_id] [dias]`: Cria botão de verificação
   - Validações:
     - URL deve começar com `http(s)://`
     - Acesso restrito a donos do bot (`@is_owner()`)
+- **Gerenciamento de Apoiadores**:
+  - Adicionar meses de apoio manual
+  - Pausar/continuar doações
+  - Remover apoiadores
+  - Suporte a doações externas (apoia-se, etc.)
 
 ### 🎮 RPG (`rpg_system.py`)
 - **Comandos**:
