@@ -17,6 +17,7 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - Criado `bot/database/__init__.py` com configurações SQLAlchemy completas (síncrono e assíncrono)
   - Adicionadas `SessionLocal` e `get_db` para compatibilidade com FastAPI
   - Corrigido uso incorreto de `discord.select` para `sqlalchemy.select` em `main.py`
+  - Corrigido caminho dos templates HTML de `bot/web/templates/` para `frontend/src/pages/`
   - Bot e servidor web agora inicializam sem erros de importação
 
 ---
