@@ -956,7 +956,7 @@ class AdminCommands(commands.Cog):
 
     # ==================== SLASH COMMANDS - SUPPORTER MANAGEMENT ====================
 
-    @commands.slash_command(name="add_supporter", description="[ADMIN] Adicionar ou estender apoio de um usuário")
+    @discord.app_commands.command(name="add_supporter", description="[ADMIN] Adicionar ou estender apoio de um usuário")
     async def add_supporter(
         self, 
         interaction: discord.Interaction, 
@@ -981,7 +981,7 @@ class AdminCommands(commands.Cog):
             tipo_apoio=type
         )
 
-    @commands.slash_command(name="pause_supporter", description="[ADMIN] Pausar apoio de um usuário")
+    @discord.app_commands.command(name="pause_supporter", description="[ADMIN] Pausar apoio de um usuário")
     async def pause_supporter(self, interaction: discord.Interaction, user: discord.User):
         """Pausa o apoio de um usuário temporariamente"""
         if not check_is_owner(interaction):
@@ -990,7 +990,7 @@ class AdminCommands(commands.Cog):
 
         await self._manage_supporter_action(interaction, str(user.id), 'pausar')
 
-    @commands.slash_command(name="resume_supporter", description="[ADMIN] Retomar apoio de um usuário")
+    @discord.app_commands.command(name="resume_supporter", description="[ADMIN] Retomar apoio de um usuário")
     async def resume_supporter(self, interaction: discord.Interaction, user: discord.User):
         """Retoma o apoio de um usuário que foi pausado"""
         if not check_is_owner(interaction):
@@ -999,7 +999,7 @@ class AdminCommands(commands.Cog):
 
         await self._manage_supporter_action(interaction, str(user.id), 'continuar')
 
-    @commands.slash_command(name="remove_supporter", description="[ADMIN] Remover apoio de um usuário")
+    @discord.app_commands.command(name="remove_supporter", description="[ADMIN] Remover apoio de um usuário")
     async def remove_supporter(self, interaction: discord.Interaction, user: discord.User):
         """Remove completamente o apoio de um usuário"""
         if not check_is_owner(interaction):

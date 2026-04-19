@@ -5,21 +5,20 @@ Todas as mudanças importantes no HugMe serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [1.12.3] - 2026-04-17
+## [1.12.4] - 2026-04-18
 
 ### Adicionado
-- **Sistema de Safeguard Aprimorado**: Detecção expandida de crises emocionais
-  - Adicionadas variações de "tortura" na lista de palavras-chave de crise
-  - Melhor proteção contra conteúdo sensível no chat DeepSeek
+- **Sistema de Gerenciamento de Apoiadores aprimorado**
+  - Modal de CRUD trocado por botões
 
 ### Correções
-- **Erro Crítico de Importação**: Resolvidos problemas de inicialização do bot e servidor web
+- **problemas de inicialização do bot e servidor web**
   - Criado `bot/database/__init__.py` com configurações SQLAlchemy completas (síncrono e assíncrono)
   - Adicionadas `SessionLocal` e `get_db` para compatibilidade com FastAPI
   - Corrigido uso incorreto de `discord.select` para `sqlalchemy.select` em `main.py`
   - Corrigido caminho dos templates HTML de `bot/web/templates/` para `frontend/src/pages/`
   - Bot e servidor web agora inicializam sem erros de importação
-
+- **Remoção de Emojis da documentação criado pelo assistente localhost**
 ---
 
 ## [1.12.2] - 2026-04-17

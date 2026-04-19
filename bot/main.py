@@ -108,7 +108,7 @@ class HugMeBot(commands.Bot):
     async def on_member_join(self, member):
         logger.info(f"Novo membro: {member.display_name}")
 
-    async def on_command_error(ctx: commands.Context, error):
+    async def on_command_error(self, ctx: commands.Context, error):
         logger.error(f"Erro no comando {ctx.command}: {error}")
 
         try:
