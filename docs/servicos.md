@@ -1,4 +1,4 @@
-# ⚙️ Serviços do Bot
+# Serviços do Bot
 
 ## PagBank (`servicos/__init__.py`)
 - **Funções**:

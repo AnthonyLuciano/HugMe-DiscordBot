@@ -1,69 +1,102 @@
-# ⚙️ Configuração
+# Configuração
 
-## Variáveis Essenciais
+## Variáveis de Ambiente
+
+Crie um arquivo `.env` na raiz do projeto baseando-se no `.env.example`. Abaixo está a descrição de cada variável.
+
+### Discord
 ```ini
-# Discord
-DISCORD_BOT_TOKEN=                    # Token do bot Discord
-APPLICATION_ID=                       # Application ID do bot
-
-# Banco de Dados
-DATABASE_URL=                         # URL de conexão PostgreSQL/MariaDB
-
-# Ko-fi (Doações)
-KOFI_TOKEN=                           # Token de verificação webhook
-KOFI_ENDPOINT=                        # Endpoint webhook Ko-fi
-DISCORD_DONOHOOK_URL=                 # Webhook para notificações de doação
-KOFI_LOG_CHANNEL_ID=                  # Canal de logs de doação
-
-# API DeepSeek (RPG)
-DEEP_API=                             # URL da API DeepSeek
-DEEP_KEY=                             # API Key DeepSeek
-
-# Webhook e Segurança
-WEBHOOK_SECRET=                       # Segurança de webhook
-ADMIN_TOKEN=                          # Token de admin para painel web
-
-# Discord (Cargos)
-QUARTO_DO_HUGME=                      # ID do canal "Quarto do HugMe"
-APOIADOR_CARGO_ID=                    # ID do cargo nível 1
-APOIADOR_CARGO_ID2=                   # ID do cargo nível 2 (padrão)
-TEST_SERVER_ID=                       # ID do servidor de testes
-
-# Ambiente
-USE_NGROK=true                        # Usar Ngrok para testes (dev)
-NGROK_URL=                            # URL do Ngrok (dev)
+APPLICATION_ID=          # Application ID do bot (Discord Developer Portal)
+DISCORD_CLIENT_ID=      # Client ID OAuth2 do bot
+DISCORD_CLIENT_SECRET=  # Client Secret OAuth2 do bot
+DISCORD_BOT_TOKEN=      # Token do bot Discord
+DEV_ID=                 # ID do desenvolvedor (acesso owner)
+TRUSTED_MOD_ID=         # ID do moderador confiável
+GUILD_ID=               # ID do servidor principal
+APOIADOR_CARGO_ID=      # ID do cargo de apoiador
+VERIFIED_ROLE_ID=       # ID do cargo de membro verificado
+DISCORD_DONOHOOK_URL=   # URL do webhook para notificações de doação
 ```
 
-## Ambientes
-- **Desenvolvimento**:
-  ```ini
-  USE_NGROK=true
-  NGROK_URL=https://xxx.ngrok-free.app
-  DATABASE_URL=sqlite:///./dev.db     # Banco local
-  ```
-
-- **Produção**:
-  ```ini
-  USE_NGROK=false
-  DATABASE_URL=postgresql://user:pass@host:5432/dbname
-  DISCORD_DONOHOOK_URL=https://discord.com/webhook/...
-  ```
-
-## Variáveis de Cargo por Nível
+### Banco de Dados
 ```ini
-# No banco (GuildConfig.supporter_roles JSON):
+DATABASE_URL=            # URL de conexão (ex: postgresql://user:pass@host:5432/dbname)
+```
+
+### Ko-fi (Doações)
+```ini
+KOFI_LOG_CHANNEL_ID=    # ID do canal de logs de doação
+KOFI_TOKEN=             # Token de verificação do webhook Ko-fi
+```
+
+### DeepSeek (RPG e Chat)
+```ini
+DEEPSEEK_LOG_CHANNEL=   # ID do canal de logs do DeepSeek
+DEEPSEEK_API_KEY=       # API Key do DeepSeek
+QUARTO_DO_HUGME=        # ID do canal "Quarto do HugMe"
+```
+
+### Produção e Desenvolvimento
+```ini
+REDIRECT_URL=           # URL de redirect OAuth2 (produção)
+NGROK_URL=              # URL do Ngrok (desenvolvimento local)
+```
+
+### Segurança
+```ini
+SESSION_SECRET=         # Segredo para sessões do painel web
+ADMIN_TOKEN=            # Token de acesso admin ao painel web
+WEBHOOK_SECRET=         # Segredo para validação de webhooks
+```
+
+---
+
+## Ambientes
+
+### Desenvolvimento
+```ini
+NGROK_URL=https://xxx.ngrok-free.app
+DATABASE_URL=sqlite:///./dev.db
+```
+- Use Ngrok para expor o servidor local e receber webhooks
+- Banco SQLite local para testes rápidos
+
+### Produção
+```ini
+REDIRECT_URL=https://seu-dominio.com/callback
+DATABASE_URL=postgresql://user:pass@host:5432/dbname
+DISCORD_DONOHOOK_URL=https://discord.com/api/webhooks/...
+```
+- Domínio próprio com HTTPS
+- Banco PostgreSQL para dados persistentes
+- Webhooks configurados nos painéis Ko-fi e PagBank
+
+---
+
+## Configuração de Webhooks
+
+### Ko-fi Webhook
+No painel do Ko-fi, configure a URL:
+```
+https://seu-dominio.com/kofi-webhook
+```
+
+### PagBank Webhook
+No painel do PagBank, configure a URL:
+```
+https://seu-dominio.com/webhook
+```
+
+---
+
+## Cargos por Nível
+
+Os cargos por nível de apoio são configurados no banco de dados (campo `GuildConfig.supporter_roles` em JSON):
+```json
 {
   "1": "cargo_id_nivel_1",
   "2": "cargo_id_nivel_2",
   "3": "cargo_id_nivel_3"
 }
 ```
-
-## Variáveis de Webhook
-```ini
-# Ko-fi Webhook (configurado no painel Ko-fi):
-https://seu-domínio.com/kofi-webhook
-
-# PagBank Webhook (configurado no painel PagBank):
-https://seu-domínio.com/webhook
-```
+Use o comando `/configure_time_roles` no Discord para configurar visualmente.

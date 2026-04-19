@@ -108,11 +108,25 @@ class HugMeBot(commands.Bot):
     async def on_member_join(self, member):
         logger.info(f"Novo membro: {member.display_name}")
 
-    async def on_command_error(self, ctx, error):
-        if isinstance(error, commands.CommandNotFound):
-            return
+    async def on_command_error(self, ctx: commands.Context, error):
         logger.error(f"Erro no comando {ctx.command}: {error}")
-        await ctx.send(f"⚠️ Ocorreu um erro: {str(error)}")
+
+        try:
+            # Interação slash: verifica se ainda pode responder
+            if ctx.interaction:
+                if ctx.interaction.response.is_done():
+                    # Já foi respondida (pelo defer ou outra resposta) — usa followup
+                    await ctx.interaction.followup.send(f"⚠️ Ocorreu um erro: {str(error)}", ephemeral=True)
+                else:
+                    await ctx.interaction.response.send_message(f"⚠️ Ocorreu um erro: {str(error)}", ephemeral=True)
+            else:
+                # Comando de prefixo normal
+                await ctx.send(f"⚠️ Ocorreu um erro: {str(error)}")
+        except discord.NotFound:
+            # Interação expirou — só loga, não tenta responder
+            logger.warning(f"Interação expirada para o comando {ctx.command}, erro ignorado.")
+        except Exception as e:
+            logger.error(f"Falha ao enviar mensagem de erro: {e}")
 
 
 if __name__ == '__main__':

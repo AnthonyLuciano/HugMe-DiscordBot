@@ -1,0 +1,11 @@
+{
+  "files.exclude": {
+    "**/.coveragerc": true
+  },
+  "search.exclude": {
+    "**/.coveragerc": true
+  },
+  "files.watcherExclude": {
+    "**/.coveragerc": true
+  }
+}

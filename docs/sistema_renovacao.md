@@ -1,6 +1,6 @@
-# 🔄 Sistema de Renovação Automática de Apoios
+# Sistema de Renovação Automática de Apoios
 
-## 📋 Índice
+## Índice
 1. [Visão Geral](#visão-geral)
 2. [Fluxo de Renovação](#fluxo-de-renovação)
 3. [Funções Detalhadas](#funções-detalhadas)
@@ -9,7 +9,7 @@
 
 ---
 
-## 🎯 Visão Geral
+## Visão Geral
 
 O sistema agora funciona em **3 camadas** para garantir que apoiadores com assinatura Ko-fi recebam renovação automática:
 
@@ -27,7 +27,7 @@ O sistema agora funciona em **3 camadas** para garantir que apoiadores com assin
         ┌─────────────────────────────────────┐
         │ 1️⃣ WEBHOOK DETECTA RENOVAÇÃO       │
         │ (kofi_webhook function)            │
-        │ - Se é assinatura = RENOVADO ✅    │
+        │ - Se é assinatura = RENOVADO [OK]    │
         │ - Reativa: ativo=True              │
         │ - Estende: data_expiracao += 30d   │
         └─────────────────────────────────────┘
@@ -49,7 +49,7 @@ O sistema agora funciona em **3 camadas** para garantir que apoiadores com assin
 
 ---
 
-## 📊 Fluxo de Renovação
+## Fluxo de Renovação
 
 ### Cenário 1: Assinatura Ko-fi Renovando
 
@@ -72,7 +72,7 @@ DIA 30 + 2h (Scheduler executando a cada 2h):
 │  ├─ Busca membro no Discord
 │  ├─ Aplica role
 │  └─ Marca: cargo_atribuido = True
-└─ ✅ Apoiador tem cargo novamente!
+└─ [OK] Apoiador tem cargo novamente!
 
 DIA 60 (Próxima expiração):
 ├─ Scheduler check_expirations() a cada 6h
@@ -83,8 +83,7 @@ DIA 60 (Próxima expiração):
    ├─ Se encontrar: reativa novamente!
    │  ├─ ativo = True
    │  └─ data_expiracao = agora + 30 dias
-   └─ Próximo ciclo: cargo reaplicado em 2h 🔄
-```
+   └─ Próximo ciclo: cargo reaplicado em 2h ```
 
 ### Cenário 2: PIX (Sem Renovação Automática)
 
@@ -102,9 +101,9 @@ DIA X (Sem renovação):
 
 ---
 
-## 🔧 Funções Detalhadas
+## Funções Detalhadas
 
-### 1️⃣ `check_expirations()` - Detecta Expiração
+### [1] `check_expirations()` - Detecta Expiração
 
 ```python
 async def check_expirations():
@@ -132,7 +131,7 @@ Resultado: ativo = False ❌
 
 ---
 
-### 2️⃣ `renovar_apoiadores_expirados()` - Reativa Assinatura
+### [2] `renovar_apoiadores_expirados()` - Reativa Assinatura
 
 ```python
 async def renovar_apoiadores_expirados():
@@ -168,7 +167,7 @@ DEPOIS (após renovar_apoiadores_expirados):
 
 ---
 
-### 3️⃣ `reativar_cargos_da_assinatura()` - Reaplica Role
+### [3] `reativar_cargos_da_assinatura()` - Reaplica Role
 
 ```python
 async def reativar_cargos_da_assinatura():
@@ -193,22 +192,21 @@ async def reativar_cargos_da_assinatura():
 ```
 ANTES:
   ativo = True ✅
-  cargo_atribuido = False ❌ (precisa reaplicar)
+  cargo_atribuido = False [NAO] (precisa reaplicar)
   tipo_apoio = "kofi"
 
 DEPOIS (após reativar_cargos):
   ativo = True ✅
-  cargo_atribuido = True ✅ (cargo já aplicado!)
+  cargo_atribuido = True [OK] (cargo já aplicado!)
   discord: user recebeu role
 
-Discord: @User agora tem role "Apoiador" novamente! 🎉
-```
+Discord: @User agora tem role "Apoiador" novamente! ```
 
 **Propósito:** Colocar o cargo de volta no Discord
 
 ---
 
-### 4️⃣ `kofi_webhook()` - Detecta Renovação no Webhook
+### [4] `kofi_webhook()` - Detecta Renovação no Webhook
 
 **Adição ao webhook existente:**
 
@@ -264,7 +262,7 @@ Próximo passo: reativar_cargos_da_assinatura() vai rodar e aplicar cargo!
 
 ---
 
-## ⏱️ Timeline de Execução
+## Timeline de Execução
 
 ```
 ┌─ MÊS 1 ─────────────────────────────────────────┐
@@ -279,7 +277,7 @@ Próximo passo: reativar_cargos_da_assinatura() vai rodar e aplicar cargo!
 │ │  └─ ja_pago = True                           │
 │ ├─ Cargo é aplicado imediatamente              │
 │ │  └─ User recebe: @Apoiador                   │
-│ └─ ✅ Pronto!                                   │
+│ └─ [OK] Pronto!                                   │
 │                                                 │
 │ DIA 2-30: User tem cargo                       │
 └─────────────────────────────────────────────────┘
@@ -313,13 +311,13 @@ Próximo passo: reativar_cargos_da_assinatura() vai rodar e aplicar cargo!
 
 ┌─ MÊS 3 - DIA 60 ────────────────────────────────┐
 │ Mesmo ciclo se repete...                       │
-│ ✅ Renovação automática funciona indefinidly! │
+│ [OK] Renovação automática funciona indefinidly! │
 └─────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🗄️ Campos do Banco de Dados
+## Campos do Banco de Dados
 
 ### Tabela `apoiadores` - Campos Importantes
 
@@ -345,10 +343,10 @@ Próximo passo: reativar_cargos_da_assinatura() vai rodar e aplicar cargo!
 │                     NOVO APOIADOR                   │
 │  (webhook Ko-fi recebido, primeira doação)          │
 │                                                     │
-│  ✅ ativo = True                                    │
-│  ✅ data_expiracao = agora + 30 dias               │
-│  ❌ cargo_atribuido = False                         │
-│  ✅ ja_pago = True                                  │
+│  [OK] ativo = True                                    │
+│  [OK] data_expiracao = agora + 30 dias               │
+│  [NAO] cargo_atribuido = False                         │
+│  [OK] ja_pago = True                                  │
 └─────────────────────────────────────────────────────┘
 
                       ↓ (reativar_cargos roda)
@@ -357,10 +355,10 @@ Próximo passo: reativar_cargos_da_assinatura() vai rodar e aplicar cargo!
 │              CARGO APLICADO (ATIVO)                 │
 │  (User tem @Apoiador role no Discord)               │
 │                                                     │
-│  ✅ ativo = True                                    │
-│  ✅ data_expiracao = agora + 30 dias               │
-│  ✅ cargo_atribuido = True                          │
-│  ✅ ja_pago = True                                  │
+│  [OK] ativo = True                                    │
+│  [OK] data_expiracao = agora + 30 dias               │
+│  [OK] cargo_atribuido = True                          │
+│  [OK] ja_pago = True                                  │
 └─────────────────────────────────────────────────────┘
 
                  ↓ (30 dias passam...)
@@ -370,24 +368,24 @@ Próximo passo: reativar_cargos_da_assinatura() vai rodar e aplicar cargo!
 │              EXPIRADO (INATIVO)                      │
 │  (Cargo removido do user, mas dados mantidos)       │
 │                                                     │
-│  ❌ ativo = False                                   │
-│  📅 data_expiracao = 2026-05-01 (passou!)          │
-│  ✅ cargo_atribuido = True (antigo)                │
-│  ✅ ja_pago = True (antigo)                         │
+│  [NAO] ativo = False                                   │
+│ data_expiracao = 2026-05-01 (passou!)          │
+│  [OK] cargo_atribuido = True (antigo)                │
+│  [OK] ja_pago = True (antigo)                         │
 └─────────────────────────────────────────────────────┘
 
          ↓ (renovar_apoiadores_expirados roda)
          [apenas para tipo_apoio="kofi"]
 
-┌─────────────────────────────────────────────────────┐
-│              RENOVADO (REATIVADO)                    │
-│  (Sistema detectou renovação de assinatura)         │
-│                                                     │
-│  ✅ ativo = True (reativado!)                       │
-│  ✅ data_expiracao = agora + 30 dias (estendido!)  │
-│  ❌ cargo_atribuido = False (reset para reaplicar!) │
-│  ✅ ja_pago = True                                  │
-└─────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│              RENOVADO (REATIVADO)                     │
+│  (Sistema detectou renovação de assinatura)           │
+│                                                       │
+│  [OK] ativo = True (reativado!)                       │
+│  [OK] data_expiracao = agora + 30 dias (estendido!)   │
+│  [NAO] cargo_atribuido = False (reset para reaplicar!)│
+│  [OK] ja_pago = True                                  │
+└───────────────────────────────────────────────────────┘
 
              ↓ (reativar_cargos roda novamente)
 
@@ -395,18 +393,16 @@ Próximo passo: reativar_cargos_da_assinatura() vai rodar e aplicar cargo!
 │          CARGO REAPLICADO (2º CICLO)                │
 │  (User tem @Apoiador role novamente!)               │
 │                                                     │
-│  ✅ ativo = True                                    │
-│  ✅ data_expiracao = agora + 30 dias               │
-│  ✅ cargo_atribuido = True (reaplicado!)            │
-│  ✅ ja_pago = True                                  │
-└─────────────────────────────────────────────────────┘
-
-         🔄 Ciclo continua infinitamente...
+│  [OK] ativo = True                                  │
+│  [OK] data_expiracao = agora + 30 dias              │
+│  [OK] cargo_atribuido = True (reaplicado!)          │
+│  [OK] ja_pago = True                                │
+└─────────────────────────────────────────────────────┘ Ciclo continua infinitamente...
 ```
 
 ---
 
-## 📝 Resumo Rápido
+## Resumo Rápido
 
 | Evento | O que acontece | Quando |
 |--------|---------------|--------|
@@ -418,7 +414,7 @@ Próximo passo: reativar_cargos_da_assinatura() vai rodar e aplicar cargo!
 
 ---
 
-## ✅ Checklist de Implementação
+## Checklist de Implementação
 
 - [x] `check_expirations()` - Marcar como expirado
 - [x] `renovar_apoiadores_expirados()` - Reativar expirados Ko-fi
@@ -429,16 +425,16 @@ Próximo passo: reativar_cargos_da_assinatura() vai rodar e aplicar cargo!
 
 ---
 
-## 🎯 Resultado Final
+## Resultado Final
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  APOIADORES COM ASSINATURA KO-FI AGORA:            │
+│  APOIADORES COM ASSINATURA KO-FI AGORA:             │
 │                                                     │
-│  ✅ Recebem renovação AUTOMÁTICA mensalmente        │
-│  ✅ Não precisam reconfirmar a doação              │
-│  ✅ Cargo volta automaticamente a cada renovação   │
-│  ✅ Sistema rastreia histórico completo            │
-│  ✅ Tudo funciona sem intervenção manual           │
+│  [OK] Recebem renovação AUTOMÁTICA mensalmente      │
+│  [OK] Não precisam reconfirmar a doação             │
+│  [OK] Cargo volta automaticamente a cada renovação  │
+│  [OK] Sistema rastreia histórico completo           │
+│  [OK] Tudo funciona sem intervenção manual          │
 └─────────────────────────────────────────────────────┘
 ```

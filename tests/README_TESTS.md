@@ -1,8 +1,8 @@
-# 🧪 Testes do HugMe Bot
+# Testes do HugMe Bot
 
 Este diretório contém os testes unitários e de integração do sistema de doações.
 
-## 📁 Estrutura
+## Estrutura
 
 ```
 tests/
@@ -11,7 +11,7 @@ tests/
 └── README_TESTS.md          # Este arquivo
 ```
 
-## 🚀 Como Executar os Testes
+## Como Executar os Testes
 
 ### Requisitos
 
@@ -46,59 +46,59 @@ pytest --cov=bot --cov-report=html
 docker-compose run --rm app pytest
 ```
 
-## 📊 Tipos de Testes
+## Tipos de Testes
 
 ### 1. Testes do Webhook Ko-fi (`TestKofiWebhook`)
-- ✅ Nova doação única
-- ✅ Renovação de assinatura
-- ✅ Duplicata detectada
-- ✅ Token de verificação inválido
+- [OK] Nova doação única
+- [OK] Renovação de assinatura
+- [OK] Duplicata detectada
+- [OK] Token de verificação inválido
 
 ### 2. Testes do Scheduler - Check Expirations (`TestCheckExpirations`)
-- ✅ Expiração detectada
-- ✅ Nenhum apoiador expirado
+- [OK] Expiração detectada
+- [OK] Nenhum apoiador expirado
 
 ### 3. Testes do Scheduler - Renovar Apoiadores (`TestRenovarApoiadoresExpirados`)
-- ✅ Renovação Ko-fi
-- ✅ Nenhum apoiador expirado
+- [OK] Renovação Ko-fi
+- [OK] Nenhum apoiador expirado
 
 ### 4. Testes do Scheduler - Reativar Cargos (`TestReativarCargosDaAssinatura`)
-- ✅ Reativação de cargo
-- ✅ Nenhum apoiador para reativar
+- [OK] Reativação de cargo
+- [OK] Nenhum apoiador para reativar
 
 ### 5. Testes da Classe VerificacaoMembro (`TestVerificacaoMembro`)
-- ✅ Tempo no servidor
-- ✅ Verificação de tempo mínimo
-- ✅ Obtenção de apoiador
-- ✅ Atribuição de cargo após pagamento
+- [OK] Tempo no servidor
+- [OK] Verificação de tempo mínimo
+- [OK] Obtenção de apoiador
+- [OK] Atribuição de cargo após pagamento
 
 ### 6. Testes de Integração (`TestIntegracaoSistemaDoacoes`)
-- ✅ Fluxo completo de doação
-- ✅ Fluxo PIX sem renovação
+- [OK] Fluxo completo de doação
+- [OK] Fluxo PIX sem renovação
 
 ### 7. Testes de Validação (`TestValidacaoDados`)
-- ✅ Valor de doação
-- ✅ Data de expiração
-- ✅ Flag cargo atribuído
+- [OK] Valor de doação
+- [OK] Data de expiração
+- [OK] Flag cargo atribuído
 
 ### 8. Testes de Concorrência (`TestConcorrencia`)
-- ✅ Duplicata simultânea
-- ✅ Renovação simultânea
+- [OK] Duplicata simultânea
+- [OK] Renovação simultânea
 
-## 🎯 Cobertura de Testes
+## Cobertura de Testes
 
 ### Funcionalidades Testadas
 
 | Funcionalidade | Status | Cobertura |
 |---------------|--------|-----------|
-| Webhook Ko-fi | ✅ | 100% |
-| Renovação Automática | ✅ | 100% |
-| Atribuição de Cargo | ✅ | 100% |
-| Verificação de Apoiador | ✅ | 100% |
-| Scheduler Expiração | ✅ | 100% |
-| Scheduler Renovação | ✅ | 100% |
-| Scheduler Reativação | ✅ | 100% |
-| PIX vs Ko-fi | ✅ | 100% |
+| Webhook Ko-fi | [OK] | 100% |
+| Renovação Automática | [OK] | 100% |
+| Atribuição de Cargo | [OK] | 100% |
+| Verificação de Apoiador | [OK] | 100% |
+| Scheduler Expiração | [OK] | 100% |
+| Scheduler Renovação | [OK] | 100% |
+| Scheduler Reativação | [OK] | 100% |
+| PIX vs Ko-fi | [OK] | 100% |
 
 ### Linhas de Código Testadas
 
@@ -126,7 +126,7 @@ docker-compose run --rm app pytest
 5. **Request HTTP**: `AsyncMock()`
    - Webhook requests
 
-## 📈 Métricas de Teste
+## Métricas de Teste
 
 ### Antes de Implementar Novas Funcionalidades
 
@@ -141,7 +141,7 @@ docker-compose run --rm app pytest
 2. Verificar cobertura
 3. Documentar novos testes
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Erro: "ModuleNotFoundError"
 
@@ -163,7 +163,7 @@ pip install pytest-asyncio
 # Não é necessário conexão real para os testes
 ```
 
-## 📝 Boas Práticas
+## Boas Práticas
 
 1. **Cada teste deve testar uma coisa só**
 2. **Nomes descritivos**: `test_[funcionalidade]_[cenário]`
@@ -171,7 +171,7 @@ pip install pytest-asyncio
 4. **Testar cenários de erro**
 5. **Documentar testes complexos**
 
-## 🔄 Atualizar Testes
+## Atualizar Testes
 
 Quando adicionar novas funcionalidades:
 
@@ -180,7 +180,7 @@ Quando adicionar novas funcionalidades:
 3. Verificar cobertura: `pytest --cov=bot --cov-report=html`
 4. Atualizar documentação
 
-## 📚 Referências
+## Referências
 
 - [pytest documentation](https://docs.pytest.org/)
 - [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)

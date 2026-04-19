@@ -1,15 +1,19 @@
 import discord
 import logging
 import os
-from discord.ext import commands
-from discord import ui
-from bot.database.models import PixConfig, Apoiador, GuildConfig
-from bot.servicos.SupporterRoleManager import SupporterRoleManager
-from sqlalchemy import select, func
-from bot.database import AsyncSessionLocal
 from datetime import datetime, timedelta, timezone
 
+from discord import ui
+from discord.ext import commands
+from sqlalchemy import select, func
+
+from bot.database import AsyncSessionLocal
+from bot.database.models import PixConfig, Apoiador, GuildConfig
+from bot.servicos.SupporterRoleManager import SupporterRoleManager
+
 logger = logging.getLogger(__name__)
+
+# ==================== UTILITY FUNCTIONS ====================
 
 def check_is_owner(ctx_or_interaction) -> bool:
     """Verifica se o usuário é owner - funciona com Context ou Interaction"""
@@ -31,8 +35,10 @@ def check_is_owner(ctx_or_interaction) -> bool:
         allowed_ids.append(int(mod_id))
     return user_id in allowed_ids
 
-# ============== MODALS ==============
+# ==================== MODALS ====================
+
 class SetQRCodeModal(ui.Modal, title="Configurar PIX QR Code"):
+    """Modal para configurar as informações do PIX QR Code."""
     qr_url = ui.TextInput(
         label="URL do QR Code",
         placeholder="https://example.com/qrcode.png",
@@ -126,6 +132,8 @@ class ConfigureRoleModal(ui.Modal, title="Configurar Cargo de Apoiador"):
         await interaction.response.defer()
 
 
+# ==================== VIEWS ====================
+
 class ConfirmView(ui.View):
     """View simples com botões Confirmar/Cancelar"""
     def __init__(self, timeout=180):
@@ -146,7 +154,7 @@ class ConfirmView(ui.View):
 
 
 class DashboardView(ui.View):
-    """Dashboard principal com acesso a todas as funções"""
+    """Dashboard principal com acesso a todas as funções administrativas."""
     def __init__(self, bot, cog):
         super().__init__()
         self.bot = bot
@@ -169,38 +177,17 @@ class DashboardView(ui.View):
         try:
             await interaction.response.defer(ephemeral=True)
             
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    select(func.count(Apoiador.id)).where(Apoiador.ativo == True)
-                )
-                total_apoiadores = result.scalar()
-
-                thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-                result = await session.execute(
-                    select(func.count(Apoiador.id)).where(
-                        Apoiador.ultimo_pagamento >= thirty_days_ago,
-                        Apoiador.ativo == True
-                    )
-                )
-                recentes = result.scalar()
-
-                result = await session.execute(
-                    select(func.sum(Apoiador.valor_doacao)).where(Apoiador.ativo == True)
-                )
-                receita_total = result.scalar() or 0
-                receita_total /= 100
-
-                total_servidores = len(self.bot.guilds)
+            stats = await self.cog._get_dashboard_stats()
 
             embed = discord.Embed(
                 title="📊 Painel de Controle - HugMe Bot (ATUALIZADO)",
                 color=discord.Color.blue(),
                 timestamp=datetime.now(timezone.utc)
             )
-            embed.add_field(name="👥 Apoiadores Ativos", value=f"{total_apoiadores}", inline=True)
-            embed.add_field(name="🆕 Doações Recentes (30d)", value=f"{recentes}", inline=True)
-            embed.add_field(name="💰 Receita Total", value=f"R$ {receita_total:.2f}", inline=True)
-            embed.add_field(name="🏠 Servidores", value=f"{total_servidores}", inline=True)
+            embed.add_field(name="👥 Apoiadores Ativos", value=f"{stats['total_apoiadores']}", inline=True)
+            embed.add_field(name="🆕 Doações Recentes (30d)", value=f"{stats['recentes']}", inline=True)
+            embed.add_field(name="💰 Receita Total", value=f"R$ {stats['receita_total']:.2f}", inline=True)
+            embed.add_field(name="🏠 Servidores", value=f"{stats['total_servidores']}", inline=True)
 
             view = DashboardView(self.bot, self.cog)
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
@@ -209,7 +196,39 @@ class DashboardView(ui.View):
             await interaction.followup.send(f"❌ Erro ao atualizar: {str(e)}", ephemeral=True)
             logger.error(f"Erro ao atualizar dashboard: {e}")
 
-    @ui.button(label="📋 Apoiadores", style=discord.ButtonStyle.secondary)
+    @ui.button(label="� Gerenciar Apoiadores", style=discord.ButtonStyle.primary)
+    async def manage_supporters(self, interaction: discord.Interaction, button: ui.Button):
+        if not await self.check_owner(interaction):
+            return
+        try:
+            embed = discord.Embed(
+                title="👤 Gerenciar Apoiadores Manualmente",
+                description="Gerencie apoiadores que fazem doações fora do sistema automático "
+                           "(como apoia-se).\n\n**Ações disponíveis:**\n"
+                           "• **Adicionar**: Cria ou estende apoio manual\n"
+                           "• **Pausar**: Interrompe temporariamente o apoio\n"
+                           "• **Continuar**: Retoma apoio pausado\n"
+                           "• **Remover**: Remove completamente do sistema",
+                color=discord.Color.blue()
+            )
+            embed.add_field(
+                name="📝 Como usar",
+                value="1. Clique no botão abaixo\n"
+                     "2. Digite o ID do usuário ou @menção\n"
+                     "3. Escolha a ação\n"
+                     "4. Para 'adicionar', especifique os meses\n"
+                     "5. Opcional: tipo de apoio (padrão: manual)",
+                inline=False
+            )
+
+            view = ManageSupporterView(self.bot, self.cog.role_manager)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            logger.info(f"Gerenciamento de apoiadores aberto para {interaction.user}")
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao abrir gerenciamento de apoiadores: {e}")
+
+    @ui.button(label="�📋 Apoiadores", style=discord.ButtonStyle.secondary)
     async def view_supporters(self, interaction: discord.Interaction, button: ui.Button):
         if not await self.check_owner(interaction):
             return
@@ -779,12 +798,215 @@ class RoleConfigView(ui.View):
             await interaction.response.send_message(f"❌ Erro ao atualizar: {str(e)}", ephemeral=True)
 
 
+# ==================== COG ====================
+
 class AdminCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.role_manager = SupporterRoleManager(bot)
 
-    @commands.hybrid_command(name="set_qrcode", description="[ADMIN] Atualiza a imagem do QR Code PIX e chave estática")
+    async def _get_dashboard_stats(self):
+        """Obtém estatísticas para o dashboard."""
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(func.count(Apoiador.id)).where(Apoiador.ativo == True)
+            )
+            total_apoiadores = result.scalar()
+
+            thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+            result = await session.execute(
+                select(func.count(Apoiador.id)).where(
+                    Apoiador.ultimo_pagamento >= thirty_days_ago,
+                    Apoiador.ativo == True
+                )
+            )
+            recentes = result.scalar()
+
+            result = await session.execute(
+                select(func.sum(Apoiador.valor_doacao)).where(Apoiador.ativo == True)
+            )
+            receita_total = result.scalar() or 0
+            receita_total /= 100
+
+            total_servidores = len(self.bot.guilds)
+
+        return {
+            'total_apoiadores': total_apoiadores,
+            'recentes': recentes,
+            'receita_total': receita_total,
+            'total_servidores': total_servidores
+        }
+
+    async def _manage_supporter_action(
+        self, 
+        interaction: discord.Interaction, 
+        discord_id: str, 
+        action: str, 
+        months: int = None, 
+        tipo_apoio: str = "manual"
+    ):
+        """Função auxiliar para gerenciar apoiadores"""
+        guild_id = str(interaction.guild.id)
+        
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(Apoiador).where(
+                        Apoiador.discord_id == discord_id,
+                        Apoiador.guild_id == guild_id
+                    )
+                )
+                apoiador = result.scalars().first()
+                now = datetime.now(timezone.utc)
+
+                if action == 'adicionar':
+                    if not apoiador:
+                        data_expiracao = now + timedelta(days=months * 30)
+                        apoiador = Apoiador(
+                            discord_id=discord_id,
+                            guild_id=guild_id,
+                            tipo_apoio=tipo_apoio,
+                            duracao_meses=months,
+                            data_inicio=now,
+                            ultimo_pagamento=now,
+                            ativo=True,
+                            data_expiracao=data_expiracao,
+                            cargo_atribuido=False,
+                            ja_pago=True
+                        )
+                        session.add(apoiador)
+                        message = f"✅ Apoiador criado: {months} meses de {tipo_apoio}"
+                    else:
+                        if apoiador.ativo:
+                            if apoiador.data_expiracao:
+                                apoiador.data_expiracao += timedelta(days=months * 30)
+                            else:
+                                apoiador.data_expiracao = now + timedelta(days=months * 30)
+                            apoiador.duracao_meses = (apoiador.duracao_meses or 0) + months
+                            apoiador.ultimo_pagamento = now
+                            message = f"✅ Apoiador estendido: +{months} meses (total: {apoiador.duracao_meses} meses)"
+                        else:
+                            apoiador.ativo = True
+                            apoiador.data_expiracao = now + timedelta(days=months * 30)
+                            apoiador.duracao_meses = months
+                            apoiador.ultimo_pagamento = now
+                            message = f"✅ Apoiador reativado: {months} meses de {tipo_apoio}"
+
+                elif action == 'pausar':
+                    if not apoiador or not apoiador.ativo:
+                        await interaction.response.send_message("❌ Apoiador não encontrado ou já inativo.", ephemeral=True)
+                        return False
+                    apoiador.ativo = False
+                    message = "✅ Apoiador pausado (doações interrompidas)"
+
+                elif action == 'continuar':
+                    if not apoiador:
+                        await interaction.response.send_message("❌ Apoiador não encontrado.", ephemeral=True)
+                        return False
+                    if apoiador.ativo:
+                        await interaction.response.send_message("❌ Apoiador já está ativo.", ephemeral=True)
+                        return False
+                    apoiador.ativo = True
+                    apoiador.ultimo_pagamento = now
+                    message = "✅ Apoiador reativado (doações continuadas)"
+
+                elif action == 'remover':
+                    if not apoiador:
+                        await interaction.response.send_message("❌ Apoiador não encontrado.", ephemeral=True)
+                        return False
+                    await session.delete(apoiador)
+                    message = "✅ Apoiador removido do sistema"
+
+                await session.commit()
+
+            # Atualizar cargos
+            try:
+                member = interaction.guild.get_member(int(discord_id))
+                if member:
+                    if action in ['adicionar', 'continuar']:
+                        await self.role_manager.assign_default_supporter_role(member)
+                        await self.role_manager.update_member_time_based_roles(member)
+                    else:
+                        config = await self.role_manager.get_guild_config(guild_id)
+                        if config and config.cargo_apoiador_default:
+                            role = interaction.guild.get_role(int(config.cargo_apoiador_default))
+                            if role and role in member.roles:
+                                await member.remove_roles(role)
+            except Exception as e:
+                logger.error(f"Erro ao atualizar cargos: {e}")
+
+            embed = discord.Embed(
+                title="✅ Apoiador Gerenciado",
+                color=discord.Color.green(),
+                description=message
+            )
+            embed.add_field(name="Usuário", value=f"<@{discord_id}>", inline=True)
+            embed.add_field(name="Ação", value=action.title(), inline=True)
+            if months:
+                embed.add_field(name="Meses", value=str(months), inline=True)
+
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            logger.info(f"Apoiador gerenciado por {interaction.user}: {discord_id} - {action}")
+            return True
+
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao gerenciar apoiador: {e}")
+            return False
+
+    # ==================== SLASH COMMANDS - SUPPORTER MANAGEMENT ====================
+
+    @discord.app_commands.command(name="add_supporter", description="[ADMIN] Adicionar ou estender apoio de um usuário")
+    async def add_supporter(
+        self, 
+        interaction: discord.Interaction, 
+        user: discord.User, 
+        months: int,
+        type: str = "manual"
+    ):
+        """Adiciona ou estende apoio de um usuário"""
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar esse comando!", ephemeral=True)
+            return
+        
+        if months <= 0:
+            await interaction.response.send_message("❌ O número de meses deve ser maior que 0.", ephemeral=True)
+            return
+
+        await self._manage_supporter_action(
+            interaction, 
+            str(user.id), 
+            'adicionar', 
+            months=months, 
+            tipo_apoio=type
+        )
+
+    @discord.app_commands.command(name="pause_supporter", description="[ADMIN] Pausar apoio de um usuário")
+    async def pause_supporter(self, interaction: discord.Interaction, user: discord.User):
+        """Pausa o apoio de um usuário temporariamente"""
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar esse comando!", ephemeral=True)
+            return
+
+        await self._manage_supporter_action(interaction, str(user.id), 'pausar')
+
+    @discord.app_commands.command(name="resume_supporter", description="[ADMIN] Retomar apoio de um usuário")
+    async def resume_supporter(self, interaction: discord.Interaction, user: discord.User):
+        """Retoma o apoio de um usuário que foi pausado"""
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar esse comando!", ephemeral=True)
+            return
+
+        await self._manage_supporter_action(interaction, str(user.id), 'continuar')
+
+    @discord.app_commands.command(name="remove_supporter", description="[ADMIN] Remover apoio de um usuário")
+    async def remove_supporter(self, interaction: discord.Interaction, user: discord.User):
+        """Remove completamente o apoio de um usuário"""
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar esse comando!", ephemeral=True)
+            return
+
+        await self._manage_supporter_action(interaction, str(user.id), 'remover')
     async def set_qrcode(self, ctx: commands.Context):
         """Update the static QR code image URL and PIX key in database"""
         if not check_is_owner(ctx.interaction if hasattr(ctx, 'interaction') else ctx):
@@ -805,38 +1027,17 @@ class AdminCommands(commands.Cog):
             await ctx.send("❌ Apenas admins podem usar esse comando!", ephemeral=True)
             return
         try:
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    select(func.count(Apoiador.id)).where(Apoiador.ativo == True)
-                )
-                total_apoiadores = result.scalar()
-
-                thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-                result = await session.execute(
-                    select(func.count(Apoiador.id)).where(
-                        Apoiador.ultimo_pagamento >= thirty_days_ago,
-                        Apoiador.ativo == True
-                    )
-                )
-                recentes = result.scalar()
-
-                result = await session.execute(
-                    select(func.sum(Apoiador.valor_doacao)).where(Apoiador.ativo == True)
-                )
-                receita_total = result.scalar() or 0
-                receita_total /= 100
-
-                total_servidores = len(self.bot.guilds)
+            stats = await self._get_dashboard_stats()
 
             embed = discord.Embed(
                 title="📊 Painel de Controle - HugMe Bot",
                 color=discord.Color.blue(),
                 timestamp=datetime.now(timezone.utc)
             )
-            embed.add_field(name="👥 Apoiadores Ativos", value=f"{total_apoiadores}", inline=True)
-            embed.add_field(name="🆕 Doações Recentes (30d)", value=f"{recentes}", inline=True)
-            embed.add_field(name="💰 Receita Total", value=f"R$ {receita_total:.2f}", inline=True)
-            embed.add_field(name="🏠 Servidores", value=f"{total_servidores}", inline=True)
+            embed.add_field(name="👥 Apoiadores Ativos", value=f"{stats['total_apoiadores']}", inline=True)
+            embed.add_field(name="🆕 Doações Recentes (30d)", value=f"{stats['recentes']}", inline=True)
+            embed.add_field(name="💰 Receita Total", value=f"R$ {stats['receita_total']:.2f}", inline=True)
+            embed.add_field(name="🏠 Servidores", value=f"{stats['total_servidores']}", inline=True)
             embed.set_footer(text=f"Clique nos botões abaixo para gerenciar tudo!")
 
             view = DashboardView(self.bot, self)
@@ -988,6 +1189,256 @@ class AdminCommands(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Erro ao mostrar configuração PIX: {str(e)}", ephemeral=True)
             logger.error(f"Erro ao mostrar PIX config: {e}")
+
+
+    @commands.hybrid_command(name="manage_supporter", description="[ADMIN] Gerencia apoiadores manualmente (adicionar, pausar, continuar, remover)")
+    async def manage_supporter(self, ctx: commands.Context):
+        """Manually manage supporters (add, pause, continue, remove)"""
+        if not check_is_owner(ctx.interaction if hasattr(ctx, 'interaction') else ctx):
+            await ctx.send("❌ Apenas admins podem usar esse comando!", ephemeral=True)
+            return
+        try:
+            embed = discord.Embed(
+                title="👤 Gerenciar Apoiador Manualmente",
+                description="Use o botão abaixo para abrir o formulário de gerenciamento de apoiadores.\n\n**Ações disponíveis:**\n• **Adicionar**: Cria ou estende apoio manual\n• **Pausar**: Interrompe temporariamente o apoio\n• **Continuar**: Retoma apoio pausado\n• **Remover**: Remove completamente do sistema",
+                color=discord.Color.blue()
+            )
+            embed.add_field(
+                name="📝 Como usar",
+                value="1. Clique no botão\n2. Digite o ID do usuário ou @menção\n3. Escolha a ação\n4. Para 'adicionar', especifique os meses\n5. Opcional: tipo de apoio (padrão: manual)",
+                inline=False
+            )
+
+            view = ManageSupporterView(self.bot, self.role_manager)
+            await ctx.send(embed=embed, view=view, ephemeral=True)
+            logger.info(f"Gerenciamento de apoiador aberto para {ctx.author}")
+        except Exception as e:
+            await ctx.send(f"❌ Erro ao abrir gerenciamento: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao abrir gerenciamento de apoiador: {e}")
+
+
+class SupporterActionModal(ui.Modal):
+    """Modal simples para cada ação de gerenciamento de apoiador."""
+    usuario = ui.TextInput(
+        label="ID do Usuário ou @menção",
+        placeholder="123456789 ou @usuario",
+        required=True,
+        max_length=50
+    )
+    meses = ui.TextInput(
+        label="Meses (apenas para adicionar)",
+        placeholder="5",
+        required=False,
+        max_length=3
+    )
+    tipo = ui.TextInput(
+        label="Tipo de Apoio (opcional)",
+        placeholder="apoia-se, pix, manual",
+        default="manual",
+        required=False,
+        max_length=20
+    )
+
+    def __init__(self, role_manager, action: str, title: str):
+        self.role_manager = role_manager
+        self.action = action
+        super().__init__(title=title)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            user_input = str(self.usuario).strip()
+            if user_input.startswith('<@') and user_input.endswith('>'):
+                user_id = user_input.replace('<@', '').replace('>', '').replace('!', '')
+            else:
+                user_id = user_input
+
+            try:
+                discord_id = str(int(user_id))
+            except ValueError:
+                await interaction.response.send_message("❌ ID de usuário inválido.", ephemeral=True)
+                return
+
+            action = self.action
+            months = None
+            if action == 'adicionar':
+                if not self.meses.value:
+                    await interaction.response.send_message("❌ Para adicionar, informe os meses.", ephemeral=True)
+                    return
+                try:
+                    months = int(str(self.meses).strip())
+                    if months <= 0:
+                        await interaction.response.send_message("❌ Meses deve ser maior que 0.", ephemeral=True)
+                        return
+                except ValueError:
+                    await interaction.response.send_message("❌ Número de meses inválido.", ephemeral=True)
+                    return
+
+            tipo_apoio = str(self.tipo).strip() or "manual"
+            guild_id = str(interaction.guild.id)
+
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(Apoiador).where(
+                        Apoiador.discord_id == discord_id,
+                        Apoiador.guild_id == guild_id
+                    )
+                )
+                apoiador = result.scalars().first()
+                now = datetime.now(timezone.utc)
+
+                if action == 'adicionar':
+                    if not apoiador:
+                        data_expiracao = now + timedelta(days=months * 30)
+                        apoiador = Apoiador(
+                            discord_id=discord_id,
+                            guild_id=guild_id,
+                            tipo_apoio=tipo_apoio,
+                            duracao_meses=months,
+                            data_inicio=now,
+                            ultimo_pagamento=now,
+                            ativo=True,
+                            data_expiracao=data_expiracao,
+                            cargo_atribuido=False,
+                            ja_pago=True
+                        )
+                        session.add(apoiador)
+                        message = f"✅ Apoiador criado: {months} meses de {tipo_apoio}"
+                    else:
+                        if apoiador.ativo:
+                            if apoiador.data_expiracao:
+                                apoiador.data_expiracao += timedelta(days=months * 30)
+                            else:
+                                apoiador.data_expiracao = now + timedelta(days=months * 30)
+                            apoiador.duracao_meses = (apoiador.duracao_meses or 0) + months
+                            apoiador.ultimo_pagamento = now
+                            message = f"✅ Apoiador estendido: +{months} meses (total: {apoiador.duracao_meses} meses)"
+                        else:
+                            apoiador.ativo = True
+                            apoiador.data_expiracao = now + timedelta(days=months * 30)
+                            apoiador.duracao_meses = months
+                            apoiador.ultimo_pagamento = now
+                            message = f"✅ Apoiador reativado: {months} meses de {tipo_apoio}"
+
+                elif action == 'pausar':
+                    if not apoiador or not apoiador.ativo:
+                        await interaction.response.send_message("❌ Apoiador não encontrado ou já inativo.", ephemeral=True)
+                        return
+                    apoiador.ativo = False
+                    message = "✅ Apoiador pausado (doações interrompidas)"
+
+                elif action == 'continuar':
+                    if not apoiador:
+                        await interaction.response.send_message("❌ Apoiador não encontrado.", ephemeral=True)
+                        return
+                    if apoiador.ativo:
+                        await interaction.response.send_message("❌ Apoiador já está ativo.", ephemeral=True)
+                        return
+                    apoiador.ativo = True
+                    apoiador.ultimo_pagamento = now
+                    message = "✅ Apoiador reativado (doações continuadas)"
+
+                elif action == 'remover':
+                    if not apoiador:
+                        await interaction.response.send_message("❌ Apoiador não encontrado.", ephemeral=True)
+                        return
+                    await session.delete(apoiador)
+                    message = "✅ Apoiador removido do sistema"
+
+                await session.commit()
+
+            try:
+                member = interaction.guild.get_member(int(discord_id))
+                if member:
+                    if action in ['adicionar', 'continuar']:
+                        await self.role_manager.assign_default_supporter_role(member)
+                        await self.role_manager.update_member_time_based_roles(member)
+                    else:
+                        config = await self.role_manager.get_guild_config(guild_id)
+                        if config and config.cargo_apoiador_default:
+                            role = interaction.guild.get_role(int(config.cargo_apoiador_default))
+                            if role and role in member.roles:
+                                await member.remove_roles(role)
+            except Exception as e:
+                logger.error(f"Erro ao atualizar cargos: {e}")
+
+            embed = discord.Embed(
+                title="✅ Apoiador Gerenciado",
+                color=discord.Color.green(),
+                description=message
+            )
+            embed.add_field(name="Usuário", value=f"<@{discord_id}>", inline=True)
+            embed.add_field(name="Ação", value=action.title(), inline=True)
+            if months:
+                embed.add_field(name="Meses", value=str(months), inline=True)
+
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            logger.info(f"Apoiador gerenciado por {interaction.user}: {discord_id} - {action}")
+
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao gerenciar apoiador: {e}")
+
+
+class ManageSupporterActionView(ui.View):
+    """View que oferece botões para escolher a ação de gerenciamento."""
+    def __init__(self, role_manager):
+        super().__init__()
+        self.role_manager = role_manager
+
+    async def _open_modal(self, interaction: discord.Interaction, action: str, title: str):
+        modal = SupporterActionModal(self.role_manager, action, title)
+        await interaction.response.send_modal(modal)
+
+    @ui.button(label="➕ Adicionar", style=discord.ButtonStyle.success)
+    async def add_supporter(self, interaction: discord.Interaction, button: ui.Button):
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
+            return
+        await self._open_modal(interaction, 'adicionar', 'Adicionar Apoiador')
+
+    @ui.button(label="⏸️ Pausar", style=discord.ButtonStyle.secondary)
+    async def pause_supporter(self, interaction: discord.Interaction, button: ui.Button):
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
+            return
+        await self._open_modal(interaction, 'pausar', 'Pausar Apoiador')
+
+    @ui.button(label="▶️ Continuar", style=discord.ButtonStyle.primary)
+    async def continue_supporter(self, interaction: discord.Interaction, button: ui.Button):
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
+            return
+        await self._open_modal(interaction, 'continuar', 'Continuar Apoiador')
+
+    @ui.button(label="🗑️ Remover", style=discord.ButtonStyle.danger)
+    async def remove_supporter(self, interaction: discord.Interaction, button: ui.Button):
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
+            return
+        await self._open_modal(interaction, 'remover', 'Remover Apoiador')
+
+
+class ManageSupporterView(ui.View):
+    """View for managing supporters manually"""
+    def __init__(self, bot, role_manager):
+        super().__init__()
+        self.bot = bot
+        self.role_manager = role_manager
+
+    @ui.button(label="👤 Gerenciar Apoiador", style=discord.ButtonStyle.primary)
+    async def manage_supporter_button(self, interaction: discord.Interaction, button: ui.Button):
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
+            return
+        try:
+            view = ManageSupporterActionView(self.role_manager)
+            await interaction.response.send_message(
+                "Selecione a ação desejada e, em seguida, preencha apenas os campos necessários.",
+                view=view,
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
 
 
 async def setup(bot):
