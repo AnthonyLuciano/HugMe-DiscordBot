@@ -1,10 +1,10 @@
 # Sistema de Cargos Baseados no Tempo de Apoio
 
-## 🎯 Visão Geral
+## Visão Geral
 
 O novo sistema permite configurar **cargos automáticos baseados no tempo de apoio** dos membros, com checagem semanal automática.
 
-## 🏗️ Componentes
+## Componentes
 
 ### 1. **Cargo Padrão de Apoiador**
 - Cargo básico que **todos os apoiadores** recebem automaticamente
@@ -20,7 +20,7 @@ O novo sistema permite configurar **cargos automáticos baseados no tempo de apo
 - Atualiza cargos de todos os apoiadores ativos
 - Comando manual: `/weekly_check_now` (apenas admin)
 
-## ⚙️ Configuração
+## Configuração
 
 ### Passo 1: Executar Migração do Banco
 ```sql
@@ -51,7 +51,7 @@ source migration_time_roles.sql;
 - Lista cargos por tempo configurados
 - Conta membros em cada nível
 
-## 🔄 Como Funciona
+## Como Funciona
 
 ### Quando Alguém Doa:
 1. **Pagamento confirmado** → Recebe cargo padrão automaticamente
@@ -64,7 +64,7 @@ source migration_time_roles.sql;
 - Atualiza cargos conforme necessário
 - Remove cargos antigos e atribui novos
 
-## 📊 Exemplo de Configuração
+## Exemplo de Configuração
 
 ```
 Cargo Padrão: "Apoiador" (todos recebem)
@@ -76,7 +76,7 @@ Cargos por Tempo:
 └── 365 dias+: "Apoiador Lendário"
 ```
 
-## 📋 Comandos Disponíveis
+## Comandos Disponíveis
 
 ### Para Admins:
 - `/set_default_supporter_role` - Define cargo padrão
@@ -87,7 +87,7 @@ Cargos por Tempo:
 ### Para Todos:
 - `/supporter_stats` - Ver estatísticas (modo leitura)
 
-## 🔧 Personalização
+## Personalização
 
 ### Tempos Sugeridos:
 - **30 dias**: Apoiador Ativo
@@ -100,17 +100,17 @@ Cargos por Tempo:
 - Soma todos os períodos de apoio ativo
 - Não remove tempo se doação expirar
 
-## 🚨 Notas Importantes
+## Notas Importantes
 
 1. **Banco de dados**: Execute a migração antes de usar
 2. **Permissões**: Bot precisa de permissões para gerenciar cargos
 3. **Hierarquia**: Bot deve estar acima dos cargos que gerencia
 4. **Checagem**: Sistema roda automaticamente, mas pode ser manual
 
-## 📈 Benefícios
+## Benefícios
 
-- ✅ **Automação completa** de cargos
-- ✅ **Escalabilidade** ilimitada
-- ✅ **Flexibilidade** de configuração por servidor
-- ✅ **Manutenção mínima** (checagem semanal automática)
-- ✅ **Reconhecimento** do tempo de apoio dos membros
+- [OK] **Automação completa** de cargos
+- [OK] **Escalabilidade** ilimitada
+- [OK] **Flexibilidade** de configuração por servidor
+- [OK] **Manutenção mínima** (checagem semanal automática)
+- [OK] **Reconhecimento** do tempo de apoio dos membros

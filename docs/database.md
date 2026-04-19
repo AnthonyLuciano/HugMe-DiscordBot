@@ -1,4 +1,4 @@
-# 🗃️ Sistema de Banco de Dados
+# Sistema de Banco de Dados
 
 ## Conexão (`bot/database/__init__.py`)
 - **Config**:

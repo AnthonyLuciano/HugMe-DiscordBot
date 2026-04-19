@@ -1,4 +1,4 @@
-# ⚙️ Configuração
+# Configuração
 
 ## Variáveis de Ambiente
 

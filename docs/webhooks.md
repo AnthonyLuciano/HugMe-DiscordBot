@@ -1,4 +1,4 @@
-# 🌐 Webhooks
+# Webhooks
 
 ## Ko-fi Webhook (`/kofi-webhook`)
 - **Arquivo**: `bot/web/main.py`

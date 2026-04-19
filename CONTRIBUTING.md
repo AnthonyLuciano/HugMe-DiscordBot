@@ -1,8 +1,8 @@
-# 🤝 Guia de Contribuição
+# Guia de Contribuição
 
 Agradecemos seu interesse em contribuir para o HugMe! Este documento explica como você pode ajudar a melhorar o bot.
 
-## 📋 Índice
+## Índice
 
 - [Como contribuir](#-como-contribuir)
 - [Tipos de contribuições](#-tipos-de-contribuições)
@@ -14,7 +14,7 @@ Agradecemos seu interesse em contribuir para o HugMe! Este documento explica com
 
 ---
 
-## 💡 Como contribuir
+## Como contribuir
 
 Existem várias maneiras de contribuir com o HugMe:
 
@@ -27,7 +27,7 @@ Existem várias maneiras de contribuir com o HugMe:
 
 ---
 
-## 🎯 Tipos de contribuições
+## Tipos de contribuições
 
 ### Novas Funcionalidades
 - Adicionar novos comandos ao bot
@@ -52,7 +52,7 @@ Existem várias maneiras de contribuir com o HugMe:
 
 ---
 
-## 🚀 Primeiros passos
+## Primeiros passos
 
 ### 1. Fork o repositório
 1. Acesse [https://github.com/AnthonyLuciano/HugMe-DiscordBot](https://github.com/AnthonyLuciano/HugMe-DiscordBot)
@@ -102,7 +102,7 @@ pytest --cov=bot --cov-report=html
 
 ---
 
-## 🛠️ Processo de desenvolvimento
+## Processo de desenvolvimento
 
 ### Antes de começar
 1. **Verifique se já existe uma issue** para o que você quer fazer
@@ -137,7 +137,7 @@ git push origin feature/nova-funcionalidade
 
 ---
 
-## 📝 Padrões de código
+## Padrões de código
 
 ### Python
 - Siga o [PEP 8](https://peps.python.org/pep-0008/) para estilo de código
@@ -176,7 +176,7 @@ async def processar_doacao(usuario: str, valor: int, metodo: str) -> bool:
 
 ---
 
-## 📤 Envio de pull requests
+## Envio de pull requests
 
 ### O que incluir
 1. **Descrição clara** do que foi mudado
@@ -208,7 +208,7 @@ async def processar_doacao(usuario: str, valor: int, metodo: str) -> bool:
 
 ---
 
-## 👀 Revisão e aprovação
+## Revisão e aprovação
 
 ### O que esperar
 1. **Revisão rápida** (1-2 dias): Feedback inicial
@@ -228,7 +228,7 @@ async def processar_doacao(usuario: str, valor: int, metodo: str) -> bool:
 
 ---
 
-## 🐛 Relatando bugs
+## Relatando bugs
 
 ### O que incluir
 1. **Descrição clara** do problema
@@ -262,7 +262,7 @@ O bot não responde e não dá cargo.
 
 ---
 
-## 💬 Perguntas?
+## Perguntas?
 
 Se tiver dúvidas:
 1. Abra uma issue com a tag "pergunta"
@@ -271,6 +271,6 @@ Se tiver dúvidas:
 
 ---
 
-## 🙏 Agradecimentos
+## Agradecimentos
 
 Agradecemos todas as contribuições! Cada ajuda conta para tornar o HugMe melhor.

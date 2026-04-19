@@ -1,6 +1,6 @@
-# 🧪 Guia de Testes - HugMe Bot
+# Guia de Testes - HugMe Bot
 
-## 📋 Índice
+## Índice
 
 1. [Visão Geral](#visão-geral)
 2. [Estrutura dos Testes](#estrutura-dos-testes)
@@ -12,7 +12,7 @@
 
 ---
 
-## 🎯 Visão Geral
+## Visão Geral
 
 Este projeto utiliza **pytest** para testes unitários e de integração do sistema de doações.
 
@@ -20,14 +20,14 @@ Este projeto utiliza **pytest** para testes unitários e de integração do sist
 
 | Componente | Status | Cobertura |
 |-----------|--------|-----------|
-| Webhook Ko-fi | ✅ | 100% |
-| Renovação Automática | ✅ | 100% |
-| Atribuição de Cargo | ✅ | 100% |
-| Verificação de Apoiador | ✅ | 100% |
-| Scheduler Expiração | ✅ | 100% |
-| Scheduler Renovação | ✅ | 100% |
-| Scheduler Reativação | ✅ | 100% |
-| PIX vs Ko-fi | ✅ | 100% |
+| Webhook Ko-fi | [TESTADO] | 100% |
+| Renovação Automática | [TESTADO] | 100% |
+| Atribuição de Cargo | [TESTADO] | 100% |
+| Verificação de Apoiador | [TESTADO] | 100% |
+| Scheduler Expiração | [TESTADO] | 100% |
+| Scheduler Renovação | [TESTADO] | 100% |
+| Scheduler Reativação | [TESTADO] | 100% |
+| PIX vs Ko-fi | [TESTADO] | 100% |
 
 ### Objetivos
 
@@ -37,7 +37,7 @@ Este projeto utiliza **pytest** para testes unitários e de integração do sist
 
 ---
 
-## 📁 Estrutura dos Testes
+## Estrutura dos Testes
 
 ```
 tests/
@@ -52,7 +52,7 @@ tests/
 
 ---
 
-## 🚀 Como Executar
+## Como Executar
 
 ### Requisitos
 
@@ -113,7 +113,7 @@ pytest tests/test_doacoes.py --cov=bot --cov-fail-under=70
 
 ---
 
-## 🧪 Tipos de Testes
+## Tipos de Testes
 
 ### 1. Testes do Webhook Ko-fi
 
@@ -121,10 +121,10 @@ pytest tests/test_doacoes.py --cov=bot --cov-fail-under=70
 
 | Teste | Descrição | Status |
 |-------|-----------|--------|
-| `test_nova_doacao_unico` | Processa nova doação | ✅ |
-| `test_renovacao_assinatura` | Detecta renovação | ✅ |
-| `test_duplicata_detectada` | Rejeita duplicata | ✅ |
-| `test_token_verificacao_invalido` | Valida token | ✅ |
+| `test_nova_doacao_unico` | Processa nova doação | [OK] |
+| `test_renovacao_assinatura` | Detecta renovação | [OK] |
+| `test_duplicata_detectada` | Rejeita duplicata | [OK] |
+| `test_token_verificacao_invalido` | Valida token | [OK] |
 
 ### 2. Testes do Scheduler - Check Expirations
 
@@ -132,8 +132,8 @@ pytest tests/test_doacoes.py --cov=bot --cov-fail-under=70
 
 | Teste | Descrição | Status |
 |-------|-----------|--------|
-| `test_expiracao_detectada` | Detecta expiração | ✅ |
-| `test_nenhum_expirado` | Nenhum expirado | ✅ |
+| `test_expiracao_detectada` | Detecta expiração | [OK] |
+| `test_nenhum_expirado` | Nenhum expirado | [OK] |
 
 ### 3. Testes do Scheduler - Renovar Apoiadores
 
@@ -141,8 +141,8 @@ pytest tests/test_doacoes.py --cov=bot --cov-fail-under=70
 
 | Teste | Descrição | Status |
 |-------|-----------|--------|
-| `test_renovacao_kofi` | Renova Ko-fi | ✅ |
-| `test_nenhum_apoiador_expirado` | Nenhum expirado | ✅ |
+| `test_renovacao_kofi` | Renova Ko-fi | [OK] |
+| `test_nenhum_apoiador_expirado` | Nenhum expirado | [OK] |
 
 ### 4. Testes do Scheduler - Reativar Cargos
 
@@ -150,8 +150,8 @@ pytest tests/test_doacoes.py --cov=bot --cov-fail-under=70
 
 | Teste | Descrição | Status |
 |-------|-----------|--------|
-| `test_reativacao_cargo` | Reaplica cargo | ✅ |
-| `test_nenhum_apoiador_para_reativar` | Nenhum para reativar | ✅ |
+| `test_reativacao_cargo` | Reaplica cargo | [OK] |
+| `test_nenhum_apoiador_para_reativar` | Nenhum para reativar | [OK] |
 
 ### 5. Testes da Classe VerificacaoMembro
 
@@ -159,10 +159,10 @@ pytest tests/test_doacoes.py --cov=bot --cov-fail-under=70
 
 | Teste | Descrição | Status |
 |-------|-----------|--------|
-| `test_tempo_servidor` | Tempo no servidor | ✅ |
-| `test_verificar_tempo_minimo` | Verificação de tempo | ✅ |
-| `test_obter_apoiador` | Obtém apoiador | ✅ |
-| `test_atribuir_cargo_apos_pagamento` | Atribui cargo | ✅ |
+| `test_tempo_servidor` | Tempo no servidor | [OK] |
+| `test_verificar_tempo_minimo` | Verificação de tempo | [OK] |
+| `test_obter_apoiador` | Obtém apoiador | [OK] |
+| `test_atribuir_cargo_apos_pagamento` | Atribui cargo | [OK] |
 
 ### 6. Testes de Integração
 
@@ -170,8 +170,8 @@ pytest tests/test_doacoes.py --cov=bot --cov-fail-under=70
 
 | Teste | Descrição | Status |
 |-------|-----------|--------|
-| `test_fluxo_completo_doacao` | Fluxo completo | ✅ |
-| `test_fluxo_pix_sem_renovacao` | Fluxo PIX | ✅ |
+| `test_fluxo_completo_doacao` | Fluxo completo | [OK] |
+| `test_fluxo_pix_sem_renovacao` | Fluxo PIX | [OK] |
 
 ### 7. Testes de Validação
 
@@ -179,9 +179,9 @@ pytest tests/test_doacoes.py --cov=bot --cov-fail-under=70
 
 | Teste | Descrição | Status |
 |-------|-----------|--------|
-| `test_validacao_valor_doacao` | Valor de doação | ✅ |
-| `test_validacao_data_expiracao` | Data de expiração | ✅ |
-| `test_validacao_cargo_atribuido` | Flag cargo | ✅ |
+| `test_validacao_valor_doacao` | Valor de doação | [OK] |
+| `test_validacao_data_expiracao` | Data de expiração | [OK] |
+| `test_validacao_cargo_atribuido` | Flag cargo | [OK] |
 
 ### 8. Testes de Concorrência
 
@@ -189,12 +189,12 @@ pytest tests/test_doacoes.py --cov=bot --cov-fail-under=70
 
 | Teste | Descrição | Status |
 |-------|-----------|--------|
-| `test_duplicata_simultanea` | Duplicata | ✅ |
-| `test_renovacao_simultanea` | Renovação | ✅ |
+| `test_duplicata_simultanea` | Duplicata | [OK] |
+| `test_renovacao_simultanea` | Renovação | [OK] |
 
 ---
 
-## 📊 Cobertura
+## Cobertura
 
 ### Linhas de Código Testadas
 
@@ -207,44 +207,44 @@ pytest tests/test_doacoes.py --cov=bot --cov-fail-under=70
 
 ### Funcionalidades Testadas
 
-- ✅ Webhook Ko-fi (nova doação, renovação, duplicata)
-- ✅ Scheduler de expiração
-- ✅ Scheduler de renovação
-- ✅ Scheduler de reativação
-- ✅ Verificação de apoiador
-- ✅ Atribuição de cargo
-- ✅ PIX vs Ko-fi
-- ✅ Validação de dados
-- ✅ Concorrência
+[IMPLEMENTADO] Webhook Ko-fi (nova doação, renovação, duplicata)
+[IMPLEMENTADO] Scheduler de expiração
+[IMPLEMENTADO] Scheduler de renovação
+[IMPLEMENTADO] Scheduler de reativação
+[IMPLEMENTADO] Verificação de apoiador
+[IMPLEMENTADO] Atribuição de cargo
+[IMPLEMENTADO] PIX vs Ko-fi
+[IMPLEMENTADO] Validação de dados
+[IMPLEMENTADO] Concorrência
 
 ---
 
-## 🎓 Boas Práticas
+## Boas Práticas
 
 ### Antes de Implementar
 
-1. ✅ Escrever testes primeiro (TDD)
-2. ✅ Testar cenários de erro
-3. ✅ Mockar dependências externas
-4. ✅ Garantir cobertura > 80%
+1. [OK] Escrever testes primeiro (TDD)
+2. [OK] Testar cenários de erro
+3. [OK] Mockar dependências externas
+4. [OK] Garantir cobertura > 80%
 
 ### Durante o Desenvolvimento
 
-1. ✅ Executar testes antes de commit
-2. ✅ Adicionar testes para novas funcionalidades
-3. ✅ Atualizar documentação
-4. ✅ Verificar cobertura
+1. [OK] Executar testes antes de commit
+2. [OK] Adicionar testes para novas funcionalidades
+3. [OK] Atualizar documentação
+4. [OK] Verificar cobertura
 
 ### Após a Implementação
 
-1. ✅ Executar todos os testes
-2. ✅ Verificar cobertura
-3. ✅ Documentar novos testes
-4. ✅ Atualizar métricas
+1. [OK] Executar todos os testes
+2. [OK] Verificar cobertura
+3. [OK] Documentar novos testes
+4. [OK] Atualizar métricas
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Erro: "ModuleNotFoundError"
 
@@ -278,7 +278,7 @@ pytest tests/test_doacoes.py --cov=bot --cov-fail-under=70
 
 ---
 
-## 📝 Exemplos de Testes
+## Exemplos de Testes
 
 ### Teste de Webhook Ko-fi
 
@@ -347,7 +347,7 @@ async def test_expiracao_detectada(self, mock_session):
 
 ---
 
-## 📚 Referências
+## Referências
 
 - [pytest documentation](https://docs.pytest.org/)
 - [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)
@@ -356,7 +356,7 @@ async def test_expiracao_detectada(self, mock_session):
 
 ---
 
-## 📞 Suporte
+## Suporte
 
 Para dúvidas sobre os testes:
 1. Consultar `tests/README_TESTS.md`

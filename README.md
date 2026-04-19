@@ -1,8 +1,10 @@
-# 🤗 HugMe - Bot de Doações e Apoio para Discord
+# HugMe - Bot de Doações e Apoio para Discord
 
 > Um bot que ajuda comunidades a receberem apoio financeiro e recompensar quem contribui, com doações via PIX e Ko-fi, além de um sistema de RPG por texto para entretenimento.
 
-## 🎯 O que é o HugMe?
+![HugMe Bot](HugMe.png)
+
+## O que é o HugMe?
 
 O **HugMe** é um bot para Discord que faz duas coisas principais:
 
@@ -22,7 +24,7 @@ Um jogo de aventuras por texto onde:
 
 ---
 
-## 💡 Como funciona?
+## Como funciona?
 
 ### Para quem quer doar:
 1. Digite `/doar` no chat
@@ -39,7 +41,7 @@ Um jogo de aventuras por texto onde:
 
 ---
 
-## 📋 Índice
+## Índice
 
 - [O que é o HugMe?](#-o-que-é-o-hugme)
 - [Como funciona?](#-como-funciona)
@@ -53,7 +55,7 @@ Um jogo de aventuras por texto onde:
 
 ---
 
-## 🎁 O que você ganha ao doar?
+## O que você ganha ao doar?
 
 ### Cargos no servidor
 - **Cargo básico**: Todos os apoiadores recebem um cargo especial
@@ -71,7 +73,7 @@ Um jogo de aventuras por texto onde:
 
 ---
 
-## 🚀 Instalação e configuração
+## Instalação e configuração
 
 ### O que precisa:
 - Um servidor Discord
@@ -94,7 +96,7 @@ No arquivo `.env`, você precisa configurar:
 
 ---
 
-## 📋 Comandos principais
+## Comandos principais
 
 ### Para todos os usuários:
 | Comando | O que faz |
@@ -115,7 +117,7 @@ No arquivo `.env`, você precisa configurar:
 
 ---
 
-## 🏅 Como o sistema de cargos funciona?
+## Como o sistema de cargos funciona?
 
 ### O ciclo automático:
 ```
@@ -137,7 +139,7 @@ No arquivo `.env`, você precisa configurar:
 
 ---
 
-## 🎮 Sistema de RPG
+## Sistema de RPG
 
 ### Como criar um personagem:
 1. Digite `/rpg_personagem`
@@ -158,7 +160,7 @@ No arquivo `.env`, você precisa configurar:
 
 ---
 
-## 💻 Painel administrativo
+## Painel administrativo
 
 ### O que é:
 Um site onde os administradores podem:
@@ -174,7 +176,7 @@ Um site onde os administradores podem:
 
 ---
 
-## 📞 Suporte e contato
+## Suporte e contato
 
 - **Problemas com o bot?** Abra uma issue no GitHub
 - **Dúvidas gerais?** Entre no servidor da comunidade
@@ -182,10 +184,10 @@ Um site onde os administradores podem:
 
 ---
 
-## 📝 Licença
+## Licença
 
 Este projeto é open-source e está sob a licença MIT. Isso significa que você pode usar, modificar e distribuir o código livremente, desde que mantenha a licença original.
 
 ---
 
-**Feito com ❤️ para a comunidade Discord**
+**Feito com carinho para a comunidade Discord**

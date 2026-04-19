@@ -1,8 +1,8 @@
-# 📜 Código de Conduta
+# Código de Conduta
 
 Nosso compromisso é criar um ambiente acolhedor e respeitoso para todos que participam deste projeto.
 
-## 🎯 Nosso compromisso
+## Nosso compromisso
 
 No contexto deste projeto, nos comprometemos a:
 
@@ -13,7 +13,7 @@ No contexto deste projeto, nos comprometemos a:
 
 ---
 
-## 📋 Nossas normas
+## Nossas normas
 
 ### Comportamento esperado
 
@@ -46,7 +46,7 @@ Os seguintes comportamentos são inaceitáveis:
 
 ---
 
-## 🛡️ Responsabilidades dos mantenedores
+## Responsabilidades dos mantenedores
 
 Os mantenedores do projeto são responsáveis por:
 
@@ -65,7 +65,7 @@ Para comportamento inaceitável, os mantenedores podem:
 
 ---
 
-## 📢 Como relatar
+## Como relatar
 
 ### Se você testemunhar ou for vítima de comportamento inaceitável:
 
@@ -91,7 +91,7 @@ Para comportamento inaceitável, os mantenedores podem:
 
 ---
 
-## 🌍 Escopo
+## Escopo
 
 Este código de conduta se aplica a:
 
@@ -102,7 +102,7 @@ Este código de conduta se aplica a:
 
 ---
 
-## 📚 Referências
+## Referências
 
 Este código de conduta é baseado em:
 
@@ -112,12 +112,12 @@ Este código de conduta é baseado em:
 
 ---
 
-## 📝 Licença
+## Licença
 
 Este Código de Conduta está licenciado sob a licença MIT.
 
 ---
 
-## 🙏 Agradecimentos
+## Agradecimentos
 
 Agradecemos a todos que ajudam a manter este projeto como um ambiente respeitoso e acolhedor para todos.

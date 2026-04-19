@@ -1,4 +1,4 @@
-# 📜 Comandos do Bot
+# Comandos do Bot
 
 ## Estrutura de Comandos
 - **Localização**: `bot/commands/`
@@ -6,22 +6,22 @@
 
 ## Categorias
 
-### 🔍 Básicos (`botcheck.py`)
+### [BASICO] Básicos (`botcheck.py`)
 - **Comandos**:
   - `/check`: Verificação simples de status
   - `/ajuda`: Exibe lista de comandos via Embed
 - **Features**:
   ```python
   embed = discord.Embed(
-      title="📚 Comandos",
+      title="Comandos",
       fields=[{
-          "name": "🛠️ Básicos",
+          "name": "Basicos",
           "value": "Lista de comandos..."
       }]
   )
   ```
 
-### 💰 Doações (`doar.py`)
+### [DOACOES] Doações (`doar.py`)
 - **Fluxo**:
   1. Usuário executa `/doar`
   2. Bot exibe modal com campos:
@@ -42,7 +42,7 @@
 
 - **Dados**: Armazenados no modelo `Apoiador`
 
-### ⏳ Tempo no Servidor (`tempo.py`)
+### [TEMPO] Tempo no Servidor (`tempo.py`)
 - **Funcionalidade**:
   - Calcula tempo de membro via `VerificacaoMembro`
   - Sintaxe: `/tempo [@membro]`
@@ -52,7 +52,7 @@
   await self.verificador.tempo_servidor(member)
   ```
 
-### 🔐 Admin (`admin.py`)
+### [ADMIN] Admin (`admin.py`)
 - **Comandos Privilegiados**:
   - `/set_qrcode [url]`: Atualiza QR Code PIX
   - `/manage_supporter`: Gerencia apoiadores manualmente
@@ -66,7 +66,7 @@
   - Remover apoiadores
   - Suporte a doações externas (apoia-se, etc.)
 
-### 🎮 RPG (`rpg_system.py`)
+### RPG (`rpg_system.py`)
 - **Comandos**:
   - `/rpg_personagem [nome] [classe] [raça] [stats...]`: Cria personagem
   - `/rpg [ação]`: Interage com aventura
@@ -81,21 +81,21 @@
   - Integração DeepSeek para geração de aventuras
   - Funciona em canais públicos ou DMs
 
-### 📤 Envio de Mensagens (`sendmsg.py`)
+### Envio de Mensagens (`sendmsg.py`)
 - **Comandos**:
   - `/sendmsg [canal] [mensagem]`: Envia mensagem programada
 - **Features**:
   - Suporte a embeds
   - Agendamento via APScheduler
 
-### ⏱️ Tempo de Voz (`tempvoice.py`)
+### [TEMPORIZADA] Tempo de Voz (`tempvoice.py`)
 - **Comandos**:
   - `/tempo_voz [@membro]`: Tempo em voice channels
 - **Features**:
   - Rastreamento de tempo em voice
   - Estatísticas por servidor
 
-### 🎭 Verificação de Cargo (`verificarcargo.py`)
+### Verificação de Cargo (`verificarcargo.py`)
 - **Comandos**:
   - `/verificarcargo [cargo_id] [dias]`: Cria botão de verificação
 - **Features**:
@@ -103,7 +103,7 @@
   - Verifica tempo mínimo no servidor
   - Aplica cargo automaticamente se qualificado
 
-### 🤖 Bot Check (`botcheck.py`)
+### Bot Check (`botcheck.py`)
 - **Comandos**:
   - `/check`: Status do bot
   - `/ajuda`: Lista de comandos
@@ -111,26 +111,26 @@
   - Embed formatado
   - Informações de uptime
 
-### 🧠 DeepSeek Chat (`deepseekchat.py`)
+### DeepSeek Chat (`deepseekchat.py`)
 - **Comandos**:
   - `/deepseek [prompt]`: Chat com DeepSeek
 - **Features**:
   - API integration
   - Contexto persistente
 
-### 😂 Autismo (`autism.py`)
+### Autismo (`autism.py`)
 - **Comandos**:
   - `/autismo`: Comandos de diversão
 - **Features**:
   - Comandos leves para entretenimento
 
-### 🤗 Hug (`hug.py`)
+### Hug (`hug.py`)
 - **Comandos**:
   - `/hug [@membro]`: Abraça alguém
 - **Features**:
   - Comandos de interação social
 
-### 🙏 Doar (`doar.py`)
+### Doar (`doar.py`)
 - **Comandos**:
   - `/doar`: Inicia processo de doação
 - **Features**:

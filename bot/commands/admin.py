@@ -837,7 +837,176 @@ class AdminCommands(commands.Cog):
             'total_servidores': total_servidores
         }
 
-    @commands.hybrid_command(name="set_qrcode", description="[ADMIN] Atualiza a imagem do QR Code PIX e chave estática")
+    async def _manage_supporter_action(
+        self, 
+        interaction: discord.Interaction, 
+        discord_id: str, 
+        action: str, 
+        months: int = None, 
+        tipo_apoio: str = "manual"
+    ):
+        """Função auxiliar para gerenciar apoiadores"""
+        guild_id = str(interaction.guild.id)
+        
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(Apoiador).where(
+                        Apoiador.discord_id == discord_id,
+                        Apoiador.guild_id == guild_id
+                    )
+                )
+                apoiador = result.scalars().first()
+                now = datetime.now(timezone.utc)
+
+                if action == 'adicionar':
+                    if not apoiador:
+                        data_expiracao = now + timedelta(days=months * 30)
+                        apoiador = Apoiador(
+                            discord_id=discord_id,
+                            guild_id=guild_id,
+                            tipo_apoio=tipo_apoio,
+                            duracao_meses=months,
+                            data_inicio=now,
+                            ultimo_pagamento=now,
+                            ativo=True,
+                            data_expiracao=data_expiracao,
+                            cargo_atribuido=False,
+                            ja_pago=True
+                        )
+                        session.add(apoiador)
+                        message = f"✅ Apoiador criado: {months} meses de {tipo_apoio}"
+                    else:
+                        if apoiador.ativo:
+                            if apoiador.data_expiracao:
+                                apoiador.data_expiracao += timedelta(days=months * 30)
+                            else:
+                                apoiador.data_expiracao = now + timedelta(days=months * 30)
+                            apoiador.duracao_meses = (apoiador.duracao_meses or 0) + months
+                            apoiador.ultimo_pagamento = now
+                            message = f"✅ Apoiador estendido: +{months} meses (total: {apoiador.duracao_meses} meses)"
+                        else:
+                            apoiador.ativo = True
+                            apoiador.data_expiracao = now + timedelta(days=months * 30)
+                            apoiador.duracao_meses = months
+                            apoiador.ultimo_pagamento = now
+                            message = f"✅ Apoiador reativado: {months} meses de {tipo_apoio}"
+
+                elif action == 'pausar':
+                    if not apoiador or not apoiador.ativo:
+                        await interaction.response.send_message("❌ Apoiador não encontrado ou já inativo.", ephemeral=True)
+                        return False
+                    apoiador.ativo = False
+                    message = "✅ Apoiador pausado (doações interrompidas)"
+
+                elif action == 'continuar':
+                    if not apoiador:
+                        await interaction.response.send_message("❌ Apoiador não encontrado.", ephemeral=True)
+                        return False
+                    if apoiador.ativo:
+                        await interaction.response.send_message("❌ Apoiador já está ativo.", ephemeral=True)
+                        return False
+                    apoiador.ativo = True
+                    apoiador.ultimo_pagamento = now
+                    message = "✅ Apoiador reativado (doações continuadas)"
+
+                elif action == 'remover':
+                    if not apoiador:
+                        await interaction.response.send_message("❌ Apoiador não encontrado.", ephemeral=True)
+                        return False
+                    await session.delete(apoiador)
+                    message = "✅ Apoiador removido do sistema"
+
+                await session.commit()
+
+            # Atualizar cargos
+            try:
+                member = interaction.guild.get_member(int(discord_id))
+                if member:
+                    if action in ['adicionar', 'continuar']:
+                        await self.role_manager.assign_default_supporter_role(member)
+                        await self.role_manager.update_member_time_based_roles(member)
+                    else:
+                        config = await self.role_manager.get_guild_config(guild_id)
+                        if config and config.cargo_apoiador_default:
+                            role = interaction.guild.get_role(int(config.cargo_apoiador_default))
+                            if role and role in member.roles:
+                                await member.remove_roles(role)
+            except Exception as e:
+                logger.error(f"Erro ao atualizar cargos: {e}")
+
+            embed = discord.Embed(
+                title="✅ Apoiador Gerenciado",
+                color=discord.Color.green(),
+                description=message
+            )
+            embed.add_field(name="Usuário", value=f"<@{discord_id}>", inline=True)
+            embed.add_field(name="Ação", value=action.title(), inline=True)
+            if months:
+                embed.add_field(name="Meses", value=str(months), inline=True)
+
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            logger.info(f"Apoiador gerenciado por {interaction.user}: {discord_id} - {action}")
+            return True
+
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao gerenciar apoiador: {e}")
+            return False
+
+    # ==================== SLASH COMMANDS - SUPPORTER MANAGEMENT ====================
+
+    @commands.slash_command(name="add_supporter", description="[ADMIN] Adicionar ou estender apoio de um usuário")
+    async def add_supporter(
+        self, 
+        interaction: discord.Interaction, 
+        user: discord.User, 
+        months: int,
+        type: str = "manual"
+    ):
+        """Adiciona ou estende apoio de um usuário"""
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar esse comando!", ephemeral=True)
+            return
+        
+        if months <= 0:
+            await interaction.response.send_message("❌ O número de meses deve ser maior que 0.", ephemeral=True)
+            return
+
+        await self._manage_supporter_action(
+            interaction, 
+            str(user.id), 
+            'adicionar', 
+            months=months, 
+            tipo_apoio=type
+        )
+
+    @commands.slash_command(name="pause_supporter", description="[ADMIN] Pausar apoio de um usuário")
+    async def pause_supporter(self, interaction: discord.Interaction, user: discord.User):
+        """Pausa o apoio de um usuário temporariamente"""
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar esse comando!", ephemeral=True)
+            return
+
+        await self._manage_supporter_action(interaction, str(user.id), 'pausar')
+
+    @commands.slash_command(name="resume_supporter", description="[ADMIN] Retomar apoio de um usuário")
+    async def resume_supporter(self, interaction: discord.Interaction, user: discord.User):
+        """Retoma o apoio de um usuário que foi pausado"""
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar esse comando!", ephemeral=True)
+            return
+
+        await self._manage_supporter_action(interaction, str(user.id), 'continuar')
+
+    @commands.slash_command(name="remove_supporter", description="[ADMIN] Remover apoio de um usuário")
+    async def remove_supporter(self, interaction: discord.Interaction, user: discord.User):
+        """Remove completamente o apoio de um usuário"""
+        if not check_is_owner(interaction):
+            await interaction.response.send_message("❌ Apenas admins podem usar esse comando!", ephemeral=True)
+            return
+
+        await self._manage_supporter_action(interaction, str(user.id), 'remover')
     async def set_qrcode(self, ctx: commands.Context):
         """Update the static QR code image URL and PIX key in database"""
         if not check_is_owner(ctx.interaction if hasattr(ctx, 'interaction') else ctx):

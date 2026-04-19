@@ -1,13 +1,13 @@
-# 📚 Índice da Documentação
+# Índice da Documentação
 
 Bem-vindo à documentação do HugMe! Aqui você encontrará todas as informações necessárias para entender, configurar e usar o bot.
 
-## 🎯 Início Rápido
+## Início Rápido
 
 - [README.md](../README.md) - Visão geral do projeto e instruções de instalação
 - [CHANGELOG.md](../CHANGELOG.md) - Histórico de versões e mudanças
 
-## 📖 Documentação Técnica
+## Documentação Técnica
 
 ### Configuração
 
@@ -33,16 +33,16 @@ Bem-vindo à documentação do HugMe! Aqui você encontrará todas as informaç�
 
 - [Comandos do Bot](commands.md) - Lista completa de comandos
 
-## 📊 Arquitetura
+## Arquitetura
 
 - [Fluxo Geral](fluxogeral.puml) - Diagrama de fluxo do sistema
 - [Caso de Uso](casodeuso.puml) - Diagrama de casos de uso
 
-## 📝 Atualizações
+## Atualizações
 
 - [CHANGELOG.md](../CHANGELOG.md) - Histórico de versões e mudanças
 
-## 🤝 Contribuindo
+## Contribuindo
 
 - [Guia de Contribuição](../CONTRIBUTING.md) - Como contribuir com o projeto
 - [Código de Conduta](../CODE_OF_CONDUCT.md) - Normas de comportamento

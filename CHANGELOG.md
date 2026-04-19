@@ -1,4 +1,4 @@
-# 📝 Changelog
+# Changelog
 
 Todas as mudanças importantes no HugMe serão documentadas neste arquivo.
 
@@ -7,12 +7,12 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [1.12.3] - 2026-04-17
 
-### 🎉 Adicionado
+### Adicionado
 - **Sistema de Safeguard Aprimorado**: Detecção expandida de crises emocionais
   - Adicionadas variações de "tortura" na lista de palavras-chave de crise
   - Melhor proteção contra conteúdo sensível no chat DeepSeek
 
-### 🐛 Correções
+### Correções
 - **Erro Crítico de Importação**: Resolvidos problemas de inicialização do bot e servidor web
   - Criado `bot/database/__init__.py` com configurações SQLAlchemy completas (síncrono e assíncrono)
   - Adicionadas `SessionLocal` e `get_db` para compatibilidade com FastAPI
@@ -24,24 +24,24 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [1.12.2] - 2026-04-17
 
-### 🎉 Adicionado
+### Adicionado
 - **Gerenciamento Manual de Apoiadores**: Sistema completo para admins gerenciarem doações externas
   - Comando `/manage_supporter` para adicionar/pausar/continuar/remover apoiadores
   - Suporte a doações via apoia-se e outras formas não-automáticas
   - Integração com sistema de cargos por tempo
   - Interface modal interativa no dashboard admin
 
-### 📚 Documentação
+### Documentação
 - docs/commands.md: Atualizado com novo comando de administração
 
-### 🔧 Melhorias
+### Melhorias
 - Sistema de administração expandido com controles manuais
 
 ---
 
 ## [1.0.0] - 2026-04-16 (inicio do changelog)
 
-### 🎉 Adicionado
+### Adicionado
 - **Sistema de Doações PIX**: Integração completa com PagBank
   - Geração de QR Code dinâmico
   - Validação de pagamento via webhook
@@ -72,7 +72,7 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - Ko-fi webhook para renovações
   - PagBank webhook para pagamentos PIX
 
-### 📚 Documentação
+### Documentação
 - README.md: Documentação completa do projeto
 - docs/INDEX.md: Índice da documentação
 - docs/commands.md: Lista de comandos (atualizado com novos comandos admin)
@@ -84,20 +84,20 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - docs/web.md: Painel web
 - docs/webhooks.md: Webhooks
 
-### 🔧 Melhorias
+### Melhorias
 - Código reorganizado em módulos claros
 - Sistema de comandos padronizado
 - Modelos de banco de dados otimizados
 - Documentação completa e organizada
 
-### 🐛 Correções
+### Correções
 - Nenhuma correção nesta versão inicial
 
 ---
 
 ## [Unreleased] - Próximas Versões
 
-### 🎯 Planejado
+### Planejado
 - [ ] Notificação para usuário quando cargo for reaplicado
 - [ ] Logs detalhados de renovação
 - [ ] Painel para visualizar histórico de renovações
@@ -105,7 +105,7 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - [ ] Relatórios de conversão de doações
 - [ ] Sistema de exportação de dados
 
-### 🚧 Em Desenvolvimento
+### Em Desenvolvimento
 - [ ] Novos comandos de administração
 - [ ] Melhorias no sistema de RPG
 - [ ] Novos templates para painel web
