@@ -10,6 +10,8 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ### Adicionado
 - **Sistema de Gerenciamento de Apoiadores aprimorado**
   - Modal de CRUD trocado por botões
+- **Comando de Checagem de integridade de comandos com "/check_commands" ou !check_commands**
+
 
 ### Correções
 - **problemas de inicialização do bot e servidor web**
