@@ -5,15 +5,21 @@ Todas as mudanças importantes no HugMe serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.12.4.1] - 2026-04-18
+
+### Adicionado
+- **Melhor documentação**
+
 ## [1.12.4] - 2026-04-18
 
 ### Adicionado
+
 - **Sistema de Gerenciamento de Apoiadores aprimorado**
   - Modal de CRUD trocado por botões
 - **Comando de Checagem de integridade de comandos com "/check_commands" ou !check_commands**
 
-
 ### Correções
+
 - **problemas de inicialização do bot e servidor web**
   - Criado `bot/database/__init__.py` com configurações SQLAlchemy completas (síncrono e assíncrono)
   - Adicionadas `SessionLocal` e `get_db` para compatibilidade com FastAPI
@@ -21,11 +27,13 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - Corrigido caminho dos templates HTML de `bot/web/templates/` para `frontend/src/pages/`
   - Bot e servidor web agora inicializam sem erros de importação
 - **Remoção de Emojis da documentação criado pelo assistente localhost**
+
 ---
 
 ## [1.12.2] - 2026-04-17
 
 ### Adicionado
+
 - **Gerenciamento Manual de Apoiadores**: Sistema completo para admins gerenciarem doações externas
   - Comando `/manage_supporter` para adicionar/pausar/continuar/remover apoiadores
   - Suporte a doações via apoia-se e outras formas não-automáticas
@@ -33,9 +41,11 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - Interface modal interativa no dashboard admin
 
 ### Documentação
+
 - docs/commands.md: Atualizado com novo comando de administração
 
 ### Melhorias
+
 - Sistema de administração expandido com controles manuais
 
 ---
@@ -43,6 +53,7 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [1.0.0] - 2026-04-16 (inicio do changelog)
 
 ### Adicionado
+
 - **Sistema de Doações PIX**: Integração completa com PagBank
   - Geração de QR Code dinâmico
   - Validação de pagamento via webhook
@@ -74,6 +85,7 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - PagBank webhook para pagamentos PIX
 
 ### Documentação
+
 - README.md: Documentação completa do projeto
 - docs/INDEX.md: Índice da documentação
 - docs/commands.md: Lista de comandos (atualizado com novos comandos admin)
@@ -86,12 +98,14 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - docs/webhooks.md: Webhooks
 
 ### Melhorias
+
 - Código reorganizado em módulos claros
 - Sistema de comandos padronizado
 - Modelos de banco de dados otimizados
 - Documentação completa e organizada
 
 ### Correções
+
 - Nenhuma correção nesta versão inicial
 
 ---
@@ -99,6 +113,7 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Unreleased] - Próximas Versões
 
 ### Planejado
+
 - [ ] Notificação para usuário quando cargo for reaplicado
 - [ ] Logs detalhados de renovação
 - [ ] Painel para visualizar histórico de renovações
@@ -107,6 +122,7 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - [ ] Sistema de exportação de dados
 
 ### Em Desenvolvimento
+
 - [ ] Novos comandos de administração
 - [ ] Melhorias no sistema de RPG
 - [ ] Novos templates para painel web

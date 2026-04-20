@@ -1,12 +1,14 @@
 # Webhooks
 
 ## Ko-fi Webhook (`/kofi-webhook`)
+
 - **Arquivo**: `bot/web/main.py`
 - **Endpoint**: `POST /kofi-webhook`
 - **Fluxo**:
   1. Recebe POST com dados da transação
   2. Valida token de verificação
   3. Processa transação:
+
   ```python
   # NOVA DOAÇÃO
   apoiador = Apoiador(
@@ -23,8 +25,9 @@
       apoiador.data_expiracao = agora + 30 dias
       return {"status": "renovado"}
   ```
-  4. Atribui cargo no Discord
-  5. Notifica webhook do dono
+
+  1. Atribui cargo no Discord
+  2. Notifica webhook do dono
 
 - **Detecção de Renovação**:
   - Se `transaction_id` já existe E `type == "Subscription"`:
@@ -40,15 +43,18 @@
 ---
 
 ## PagBank Webhook
+
 - **Arquivo**: `bot/web/main.py`
 - **Fluxo**:
   1. Recebe POST com payload
   2. Valida assinatura HMAC-SHA256
   3. Atualiza status no banco:
+
   ```python
   apoiador.ultimo_pagamento = now
   apoiador.ativo = True
   ```
+
 - **Segurança**:
   - Verificação de IP (opcional)
   - Token secreto no `.env`
