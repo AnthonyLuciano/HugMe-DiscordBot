@@ -5,6 +5,17 @@ Todas as mudanças importantes no HugMe serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.12.5] - 2026-04-21
+
+### Melhorias
+
+- **Cobertura de Testes**: Aumentada de ~0% para 21%
+  - Atualizado `tests/run_tests.sh` para executar todos os 3 arquivos de testes (`test_doacoes.py`, `test_doar.py`, `test_supporter_roles.py`)
+  - Agora 32 testes passam no total (3 + 14 + 15)
+  - Geração de relatório de cobertura mais preciso e completo
+  - `SupporterRoleManager.py` com 51% de cobertura
+  - `doar.py` com 63% de cobertura
+
 ## [1.12.4.1] - 2026-04-18
 
 ### Adicionado

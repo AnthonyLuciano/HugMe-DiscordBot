@@ -15,3 +15,4 @@ hugme/bot/commands/__pycache__/__init__.cpython-313.pyc
 /bot/certificates
 /bot/web/local_test
 /frontend
+.coverage

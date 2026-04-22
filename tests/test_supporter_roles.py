@@ -67,7 +67,11 @@ class TestSupporterRoleManager:
         """Test getting role based on time"""
         # Mock guild config
         config = MagicMock()
-        config.cargos_tempo = {"30": "111", "90": "222", "365": "333"}
+        config.cargos_tempo = [
+            {"threshold": 30, "unit": "days", "role_id": "111"},
+            {"threshold": 90, "unit": "days", "role_id": "222"},
+            {"threshold": 365, "unit": "days", "role_id": "333"}
+        ]
 
         with patch.object(role_manager, 'get_guild_config', return_value=config) as mock_get_config:
             role = await role_manager.get_appropriate_time_role(mock_member.guild, 30)
@@ -166,7 +170,9 @@ class TestSupporterRoleManager:
         """Test getting guild configuration"""
         config = MagicMock()
         config.cargo_apoiador_default = "555"
-        config.cargos_tempo = {"30": "111"}
+        config.cargos_tempo = [
+            {"threshold": 30, "unit": "days", "role_id": "111"}
+        ]
 
         with patch('bot.servicos.SupporterRoleManager.AsyncSessionLocal') as mock_session_local:
             mock_session_instance = AsyncMock()
@@ -245,7 +251,10 @@ class TestSupporterRoleManager:
     async def test_get_time_based_role_exact_match(self, role_manager, mock_member):
         """Test getting time role with exact day match"""
         config = MagicMock()
-        config.cargos_tempo = {"30": "111", "60": "222"}
+        config.cargos_tempo = [
+            {"threshold": 30, "unit": "days", "role_id": "111"},
+            {"threshold": 60, "unit": "days", "role_id": "222"}
+        ]
 
         with patch.object(role_manager, 'get_guild_config', return_value=config):
             mock_member.guild.get_role.return_value = MagicMock()
@@ -256,7 +265,10 @@ class TestSupporterRoleManager:
     async def test_get_time_based_role_higher_match(self, role_manager, mock_member):
         """Test getting time role when days exceed highest tier"""
         config = MagicMock()
-        config.cargos_tempo = {"30": "111", "90": "222"}
+        config.cargos_tempo = [
+            {"threshold": 30, "unit": "days", "role_id": "111"},
+            {"threshold": 90, "unit": "days", "role_id": "222"}
+        ]
 
         with patch.object(role_manager, 'get_guild_config', return_value=config):
             mock_member.guild.get_role.return_value = MagicMock()

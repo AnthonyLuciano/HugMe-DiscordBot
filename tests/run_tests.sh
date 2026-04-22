@@ -27,7 +27,7 @@ echo ""
 echo "📝 Executando todos os testes..."
 echo ""
 
-pytest "$PROJECT_ROOT/tests/test_doacoes.py" -v --tb=short
+pytest "$PROJECT_ROOT/tests/test_doacoes.py" "$PROJECT_ROOT/tests/test_doar.py" "$PROJECT_ROOT/tests/test_supporter_roles.py" -v --tb=short
 
 # Verificar resultado
 if [ $? -eq 0 ]; then
@@ -39,7 +39,7 @@ if [ $? -eq 0 ]; then
     if python -c "import pytest_cov" &> /dev/null; then
         echo "📊 Gerando relatório de cobertura..."
         echo ""
-        pytest "$PROJECT_ROOT/tests/test_doacoes.py" --cov=bot --cov-report=html --cov-report=term
+        pytest "$PROJECT_ROOT/tests/test_doacoes.py" "$PROJECT_ROOT/tests/test_doar.py" "$PROJECT_ROOT/tests/test_supporter_roles.py" --cov=bot --cov-report=html --cov-report=term
         echo ""
         echo "📈 Relatório de cobertura salvo em: htmlcov/index.html"
     fi

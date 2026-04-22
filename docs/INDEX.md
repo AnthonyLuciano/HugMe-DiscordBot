@@ -32,6 +32,10 @@ Bem-vindo à documentação do HugMe! Aqui você encontrará todas as informaç�
 ### Comandos
 
 - [Comandos do Bot](commands.md) - Lista completa de comandos
+- [Comandos de Teste](commands/test_commands.md) - Comandos para testar funcionalidades de doação e cargos
+
+- [Comandos do Bot](commands.md) - Lista completa de comandos
+- [Comandos de Teste](commands/test_commands.md) - Comandos para testar funcionalidades de doação e cargos
 
 ## Arquitetura
 
