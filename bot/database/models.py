@@ -92,7 +92,7 @@ class GuildConfig(Base):
     guild_id: Mapped[str] = mapped_column(String(20), primary_key=True)
     role_prefix: Mapped[str] = mapped_column(String(50), default="Apoia")
     cargo_apoiador_default: Mapped[str | None] = mapped_column(String(20))  # Default supporter role for all supporters
-    cargos_tempo: Mapped[dict] = mapped_column(JSON, default=dict)  # Time-based roles: {"30": "role_id", "90": "role_id", ...}
+    cargos_tempo: Mapped[list] = mapped_column(JSON, default=list)  # Time-based roles: [{"threshold": 30, "unit": "days", "role_id": "123"}, ...]
     webhook_failures: Mapped[int] = mapped_column(Integer, default=0)  # Failure counter
     # Mapeamento de níveis de apoio para IDs de cargos (ex: {"1": "1234", "2": "5678"})
     supporter_roles: Mapped[dict] = mapped_column(JSON, default=dict)

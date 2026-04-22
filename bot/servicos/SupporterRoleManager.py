@@ -81,20 +81,54 @@ class SupporterRoleManager:
             if not config or not config.cargos_tempo:
                 return None
 
-            # Ordena os tempos em ordem decrescente para pegar o maior tempo qualificado
-            time_thresholds = sorted([int(days) for days in config.cargos_tempo.keys()], reverse=True)
+            # Converte total_days para diferentes unidades e encontra o melhor match
+            best_role = None
+            best_threshold_days = -1
 
-            for threshold in time_thresholds:
-                if total_days >= threshold:
-                    role_id = config.cargos_tempo[str(threshold)]
+            for time_config in config.cargos_tempo:
+                threshold = time_config.get('threshold', 0)
+                unit = time_config.get('unit', 'days')
+                role_id = time_config.get('role_id')
+
+                # Converte threshold para dias
+                threshold_days = self._convert_to_days(threshold, unit)
+
+                # Se o membro qualifica para este threshold E é melhor que o anterior
+                if total_days >= threshold_days and threshold_days > best_threshold_days:
                     role = guild.get_role(int(role_id))
                     if role:
-                        return role
+                        best_role = role
+                        best_threshold_days = threshold_days
 
-            return None
+            return best_role
         except Exception as e:
             logger.error(f"Erro ao obter cargo de tempo: {e}")
             return None
+
+    def _convert_to_days(self, threshold: int, unit: str) -> int:
+        """Converte um threshold para dias baseado na unidade"""
+        if unit == 'days' or unit == 'd':
+            return threshold
+        elif unit == 'weeks' or unit == 'w':
+            return threshold * 7
+        elif unit == 'months' or unit == 'm':
+            return threshold * 30  # Aproximação
+        elif unit == 'years' or unit == 'y':
+            return threshold * 365  # Aproximação
+        else:
+            logger.warning(f"Unidade de tempo desconhecida: {unit}, assumindo dias")
+            return threshold
+
+    def _format_time_threshold(self, threshold: int, unit: str) -> str:
+        """Formata um threshold de tempo para exibição"""
+        unit_names = {
+            'days': 'dias', 'd': 'dias',
+            'weeks': 'semanas', 'w': 'semanas', 
+            'months': 'meses', 'm': 'meses',
+            'years': 'anos', 'y': 'anos'
+        }
+        unit_name = unit_names.get(unit, unit)
+        return f"{threshold} {unit_name}"
 
     async def update_member_time_based_roles(self, member: discord.Member) -> bool:
         """Atualiza cargos baseados no tempo de apoio do membro"""
@@ -114,7 +148,8 @@ class SupporterRoleManager:
             config = await self.get_guild_config(str(member.guild.id))
             if config and config.cargos_tempo:
                 old_roles = []
-                for role_id in config.cargos_tempo.values():
+                for time_config in config.cargos_tempo:
+                    role_id = time_config.get('role_id')
                     role = member.guild.get_role(int(role_id))
                     if role and role in member.roles and role != time_role:
                         old_roles.append(role)
@@ -199,15 +234,17 @@ class SupporterRoleManager:
                 config = await self.get_guild_config(str(guild.id))
 
                 if config and config.cargos_tempo:
-                    for days_str, role_id in config.cargos_tempo.items():
-                        days = int(days_str)
-                        role = guild.get_role(int(role_id))
-                        if role:
-                            member_count = len([m for m in guild.members if role in m.roles])
-                            time_stats[days] = {
-                                "role_name": role.name,
-                                "member_count": member_count
-                            }
+                    for time_config in config.cargos_tempo:
+                        role_id = time_config.get('role_id')
+                        if role_id:
+                            days = time_config.get('threshold', 0)
+                            role = guild.get_role(int(role_id))
+                            if role:
+                                member_count = len([m for m in guild.members if role in m.roles])
+                                time_stats[days] = {
+                                    "role_name": role.name,
+                                    "member_count": member_count
+                                }
 
                 return {
                     "total_supporters": total_supporters,
