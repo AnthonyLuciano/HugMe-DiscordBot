@@ -5,6 +5,23 @@ Todas as mudanças importantes no HugMe serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.12.6] - 2026-04-22
+
+### Adicionado
+
+- **Sistema de Safeguard Avançado para DeepSeek Chat**
+  - Detecção de tópicos sensíveis (suicídio, automutilação, abuso, violência) em respostas da IA
+  - Reset automático de contexto a cada 10 mensagens para evitar degradação do prompt e jailbreaks acidentais
+  - Log crítico com menção direta a dev_id e mod_id quando a API tenta gerar conteúdo inadequado
+  - Instrução explícita no prompt para proibir piadas sobre temas traumáticos
+
+### Melhorias
+
+- **Reforço do Sistema de Proteção**:
+  - Filtragem dupla: entrada (usuário) + saída (API)
+  - Contexto auto-limpante para manter integridade do sistema de instruções
+  - Alertas prioritários (vermelho #FF0000) no canal de logs
+
 ## [1.12.5] - 2026-04-21
 
 ### Melhorias

@@ -29,6 +29,7 @@ CRISIS_KEYWORDS = [
 ]
 
 SAFEGUARD_REMINDER_INTERVAL = 5  # A cada X mensagens, lembra que não é terapeuta
+CONTEXT_RESET_INTERVAL = 10  # A cada X mensagens, reseta o histórico para evitar degradação do prompt
 
 MENTAL_HEALTH_RESOURCES = """
 📋 **Recursos de Saúde Mental (Brasil):**
@@ -114,6 +115,17 @@ class DeepseekCommands(commands.Cog):
         )
         await destination.send(embed=embed)
 
+    def should_reset_context(self, channel_id: int) -> bool:
+        """Verifica se está na hora de resetar o contexto para evitar jailbreak"""
+        count = self.message_count.get(channel_id, 0)
+        return count > 0 and count % CONTEXT_RESET_INTERVAL == 0
+
+    def reset_channel_context(self, channel_id: int):
+        """Limpa o histórico de contexto de um canal"""
+        if channel_id in self.message_history:
+            self.message_history[channel_id].clear()
+            logger.info(f"Contexto resetado para canal {channel_id} (após {self.message_count.get(channel_id, 0)} mensagens)")
+
     @commands.Cog.listener()
     async def on_message(self, message):
         if (not self.auto_response or message.author.bot or not self.allowed_channel_id 
@@ -142,7 +154,7 @@ class DeepseekCommands(commands.Cog):
                 return
 
             history = list(self.message_history[channel_id])
-            response = await self.call_deepseek_api(message.content, history)
+            response = await self.call_deepseek_api(message.content, history, message.author)
             await message.channel.send(f"{message.author.mention} {response}")
             
             self.message_history[channel_id].append({"role": "user", "content": message.content})
@@ -151,6 +163,10 @@ class DeepseekCommands(commands.Cog):
             # Lembrete periódico após resposta normal
             if self.should_send_reminder(channel_id):
                 await self.send_periodic_reminder(message.channel)
+            
+            # Reset do contexto para evitar jailbreak
+            if self.should_reset_context(channel_id):
+                self.reset_channel_context(channel_id)
 
             await self.log_interaction(message.author, message.content, response)
             
@@ -189,7 +205,7 @@ class DeepseekCommands(commands.Cog):
                 return
 
             history = list(self.message_history[channel_id])
-            response = await self.call_deepseek_api(mensagem, history)
+            response = await self.call_deepseek_api(mensagem, history, ctx.author)
             await ctx.channel.send(f"{ctx.author.mention} {response}")
             
             self.message_history[channel_id].append({"role": "user", "content": mensagem})
@@ -197,6 +213,10 @@ class DeepseekCommands(commands.Cog):
 
             if self.should_send_reminder(channel_id):
                 await self.send_periodic_reminder(ctx.channel)
+            
+            # Reset do contexto para evitar jailbreak
+            if self.should_reset_context(channel_id):
+                self.reset_channel_context(channel_id)
 
             await self.log_interaction(ctx.author, mensagem, response)
             
@@ -210,6 +230,46 @@ class DeepseekCommands(commands.Cog):
         status = "✅ **LIGADO**" if self.auto_response else "❌ **DESLIGADO**"
         await ctx.send(f"Respostas automáticas: {status}", ephemeral=True)
 
+    async def log_safeguard_alert(self, user: discord.User, question: str, original_response: str):
+        """Log de ALERTA CRÍTICO quando a API tenta responder com tópicos sensíveis"""
+        if not self.log_channel_id:
+            return
+        
+        mod_id = getenv('TRUSTED_MOD_ID')
+        dev_id = getenv('DEV_ID')
+        
+        mentions = []
+        if dev_id:
+            mentions.append(f"<@{dev_id}>")
+        if mod_id:
+            mentions.append(f"<@{mod_id}>")
+        
+        mention_str = " ".join(mentions) if mentions else "Admins"
+        
+        try:
+            log_channel = self.bot.get_channel(self.log_channel_id)
+            if not log_channel:
+                logger.warning(f"Canal de logs ({self.log_channel_id}) não encontrado")
+                return
+            
+            embed = discord.Embed(
+                title="🚨 ALERTA CRÍTICO - RESPOSTA COM TÓPICOS SENSÍVEIS BLOQUEADA",
+                description=f"A API Deepseek tentou responder com conteúdo sensível e foi bloqueada.",
+                color=0xFF0000,  # Vermelho crítico
+                timestamp=discord.utils.utcnow()
+            )
+            embed.add_field(name="👤 Usuário", value=f"{user.mention} (`{user.id}`)", inline=False)
+            embed.add_field(name="❓ Prompt do Usuário", value=question[:1024], inline=False)
+            embed.add_field(name="⚠️ Resposta Bloqueada (Preview)", value=original_response[:500], inline=False)
+            embed.add_field(name="🎯 Menções", value=mention_str, inline=False)
+            embed.set_footer(text="⚠️ Ação: Resposta foi substituída por mensagem segura")
+            
+            await log_channel.send(f"\n{mention_str}\n", embed=embed)
+            logger.warning(f"SAFEGUARD ALERT: Resposta bloqueada para usuário {user.id}: {original_response[:100]}")
+            
+        except Exception as e:
+            logger.error(f"Erro ao enviar alerta de safeguard: {str(e)}")
+    
     async def log_interaction(self, user: discord.User, question: str, response: str | None):
         if not self.log_channel_id:
             return
@@ -238,7 +298,7 @@ class DeepseekCommands(commands.Cog):
         except Exception as e:
             logger.error(f"Erro ao enviar log: {str(e)}")
     
-    async def call_deepseek_api(self, prompt: str, history: list) -> str:
+    async def call_deepseek_api(self, prompt: str, history: list, user: discord.User) -> str:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -256,8 +316,7 @@ Características principais:
 5. Personalidade: Seja curioso, divertido e acessível, mas sem forçar intimidade. Você pode brincar, dar sugestões, comentar sobre coisas do dia a dia.
 6. Identidade: Lembre-se de que você foi criado por MrMedicmain – pode mencionar isso de vez em quando de forma casual.
 7. Fidelidade à Pergunta: Responda somente ao que o usuário perguntou ou solicitou. Não acrescente explicações extras ou comentários adicionais desnecessários.
-8. Contexto Discord: Mantenha a linguagem informal, mas não invente fatos.
-
+8. Contexto Discord: Mantenha a linguagem informal, mas não invente fatos.9. ⚠️ REGRA CRÍTICA - TÓPICOS PROIBIDOS EM PIADAS: NUNCA, ABSOLUTAMENTE NUNCA faça piadas, brincadeiras ou qualquer conteúdo humorístico que envolva: suicídio, automutilação, abuso, violência, ou qualquer tema traumático/sensível. Se pedirem uma piada e a única forma fosse usar esses tópicos, recuse de forma amigável. Priorize temas seguros, leves e divertidos.
 LIMITES IMPORTANTES — Siga sempre:
 - Você NÃO é psicólogo, terapeuta, nem profissional de saúde mental.
 - Se alguém compartilhar sentimentos muito intensos, diga com gentileza que você não tem capacidade de ajudar com isso e sugira o CVV (188) ou um profissional.
@@ -291,6 +350,11 @@ HugMe: "puts, sinto muito ouvir isso :c esse tipo de sentimento é pesado. não 
         
         raw_response = response.json()["choices"][0]["message"]["content"]
         filtered_response = raw_response.replace("@everyone", "everyone").replace("@here", "here")
+        
+        # Filtragem de resposta: detecta se o bot respondeu com tópicos sensíveis (safeguard na saída)
+        if self.is_sensitive_message(filtered_response):
+            await self.log_safeguard_alert(user, prompt, filtered_response)
+            return "Opa, acho que estamos saindo da linha! 😅 Vamos mudar de assunto? Tem algo mais leve que eu possa ajudar?"
         
         return filtered_response
 
