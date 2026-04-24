@@ -1,6 +1,7 @@
 import discord
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 
 from discord import ui
@@ -486,52 +487,174 @@ def _build_role_config_embed(guild: discord.Guild, config) -> discord.Embed:
 
 # ==================== ROLE CONFIG VIEWS ====================
 
-class DefaultRoleSelectView(ui.View):
-    def __init__(self, bot, guild: discord.Guild):
+class PaginatedRoleSelectView(ui.View):
+    """Seleção de cargo com paginação para suportar 100+ cargos"""
+    def __init__(self, bot, guild: discord.Guild, callback, title: str, description: str, filter_time_patterns: bool = False):
         super().__init__()
         self.bot = bot
         self.guild = guild
-
-        roles = [r for r in guild.roles if not r.managed and r != guild.default_role]
-        options = [discord.SelectOption(label=r.name[:25], value=str(r.id)) for r in roles[:25]]
-
-        if options:
-            self.select_menu = ui.Select(
-                placeholder="Selecione o cargo padrão de apoiador",
-                min_values=1, max_values=1, options=options
-            )
+        self.callback = callback
+        self.title = title
+        self.description = description
+        self.filter_time_patterns = filter_time_patterns
+        self.current_page = 0
+        self.page_size = 25
+        
+        # Filtrar cargos
+        all_roles = [r for r in guild.roles if not r.managed and r != guild.default_role]
+        
+        # Se filter_time_patterns, apenas mostra cargos com padrões de tempo
+        if filter_time_patterns:
+            time_patterns = r'\b(\d+|dia|mês|ano|mes|anos|dias|meses|week|semana|horas?|hour)\b'
+            self.roles = [r for r in all_roles if re.search(time_patterns, r.name, re.IGNORECASE)]
         else:
-            self.select_menu = ui.Select(
-                placeholder="Sem cargos disponíveis",
-                disabled=True,
-                options=[discord.SelectOption(label="Nenhum cargo", value="none")]
-            )
-
-        self.select_menu.callback = self.role_selected
-        self.add_item(self.select_menu)
-
+            self.roles = all_roles
+        
+        self.update_page()
+    
+    def get_page_options(self) -> list:
+        """Retorna opções para a página atual"""
+        start = self.current_page * self.page_size
+        end = start + self.page_size
+        page_roles = self.roles[start:end]
+        
+        options = [
+            discord.SelectOption(label=r.name[:25], value=str(r.id))
+            for r in page_roles
+        ]
+        return options
+    
+    def update_page(self):
+        """Atualiza o menu de seleção e botões de navegação"""
+        # Remove dropdown anterior se existir
+        for item in list(self.children):
+            if isinstance(item, ui.Select):
+                self.remove_item(item)
+        
+        options = self.get_page_options()
+        
+        if not options:
+            options = [discord.SelectOption(label="Nenhum cargo nesta página", value="none", emoji="❌")]
+        
+        select_menu = ui.Select(
+            placeholder="Selecione um cargo",
+            min_values=1, max_values=1, options=options,
+            disabled=len(options) == 0 or options[0].value == "none"
+        )
+        select_menu.callback = self.role_selected
+        self.add_item(select_menu)
+        
+        # Atualizar botões de navegação
+        for item in list(self.children):
+            if isinstance(item, ui.Button):
+                self.remove_item(item)
+        
+        # Botão anterior
+        self.add_item(self._create_prev_button())
+        
+        # Información de página
+        total_pages = (len(self.roles) + self.page_size - 1) // self.page_size
+        page_label = f"Página {self.current_page + 1}/{total_pages}"
+        page_button = ui.Button(label=page_label, style=discord.ButtonStyle.gray, disabled=True)
+        self.add_item(page_button)
+        
+        # Botão próximo
+        self.add_item(self._create_next_button())
+    
+    def _create_prev_button(self) -> ui.Button:
+        button = ui.Button(label="⬅️ Anterior", style=discord.ButtonStyle.primary)
+        button.callback = self.prev_page
+        button.disabled = self.current_page == 0
+        return button
+    
+    def _create_next_button(self) -> ui.Button:
+        total_pages = (len(self.roles) + self.page_size - 1) // self.page_size
+        button = ui.Button(label="Próximo ➡️", style=discord.ButtonStyle.primary)
+        button.callback = self.next_page
+        button.disabled = self.current_page >= total_pages - 1
+        return button
+    
+    async def prev_page(self, interaction: discord.Interaction):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.update_page()
+            await interaction.response.edit_message(view=self)
+        else:
+            await interaction.response.defer()
+    
+    async def next_page(self, interaction: discord.Interaction):
+        total_pages = (len(self.roles) + self.page_size - 1) // self.page_size
+        if self.current_page < total_pages - 1:
+            self.current_page += 1
+            self.update_page()
+            await interaction.response.edit_message(view=self)
+        else:
+            await interaction.response.defer()
+    
     async def role_selected(self, interaction: discord.Interaction):
         try:
-            role_id = self.select_menu.values[0]
+            for item in self.children:
+                if isinstance(item, ui.Select):
+                    role_id = item.values[0]
+                    break
+            
             role = self.guild.get_role(int(role_id))
             if not role:
                 await interaction.response.send_message("❌ Cargo não encontrado.", ephemeral=True)
                 return
+            
+            await self.callback(interaction, role, self)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao selecionar cargo: {e}")
 
-            description = f"Definir **{role.name}** como cargo padrão para TODOS os apoiadores de {self.guild.name}"
-            view = ConfirmationView(
+
+class DefaultRoleSelectView(PaginatedRoleSelectView):
+    def __init__(self, bot, guild: discord.Guild):
+        async def callback(interaction, role, view):
+            description = f"Definir **{role.name}** como cargo padrão para TODOS os apoiadores de {guild.name}"
+            conf_view = ConfirmationView(
                 action_description=description,
-                confirm_callback=lambda i: self._execute_set_default_role(i, role),
+                confirm_callback=lambda i: view._execute_set_default_role(i, role),
             )
             embed = discord.Embed(
                 title="⚠️ Confirmar Ação",
                 description=f"**Ação:** {description}\n\nClique em **CONFIRMAR** para prosseguir.",
                 color=discord.Color.orange()
             )
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            await interaction.response.send_message(embed=embed, view=conf_view, ephemeral=True)
+        
+        super().__init__(
+            bot, guild, callback,
+            title="⭐ Selecione o Cargo Padrão de Apoiador",
+            description="Este cargo será atribuído automaticamente a todos os apoiadores",
+            filter_time_patterns=False
+        )
+    
+    async def _execute_set_default_role(self, interaction: discord.Interaction, role: discord.Role):
+        try:
+            guild_id = str(self.guild.id)
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(GuildConfig).where(GuildConfig.guild_id == guild_id)
+                )
+                config = result.scalars().first()
+                if not config:
+                    config = GuildConfig(guild_id=guild_id)
+                    session.add(config)
+                config.cargo_apoiador_default = str(role.id)
+                await session.commit()
+
+            embed = discord.Embed(
+                title="✅ Cargo Padrão Configurado",
+                color=discord.Color.green(),
+                description=f"Todos os apoiadores receberão automaticamente: {role.mention}"
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            logger.info(f"Cargo padrão definido por {interaction.user}: {role.id} em {guild_id}")
         except Exception as e:
-            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
-            logger.error(f"Erro ao preparar definição de cargo padrão: {e}")
+            await interaction.followup.send(f"❌ Erro ao definir cargo padrão: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao definir cargo padrão: {e}")
 
     async def _execute_set_default_role(self, interaction: discord.Interaction, role: discord.Role):
         # interaction já deferida — usar apenas followup
@@ -704,76 +827,61 @@ class TimeUnitSelectView(ui.View):
     async def _select_unit(self, interaction: discord.Interaction, unit: str):
         try:
             guild = interaction.guild
-            roles = [r for r in guild.roles if not r.managed and r != guild.default_role]
-            options = [discord.SelectOption(label=r.name[:25], value=str(r.id)) for r in roles[:25]]
-
-            if not options:
-                await interaction.response.send_message("❌ Nenhum cargo disponível.", ephemeral=True)
-                return
-
+            
+            async def callback(inter, role, view):
+                unit_display = {"days": "dias", "months": "meses", "years": "anos"}.get(unit, unit)
+                description = f"Adicionar cargo **{role.name}** para apoiadores com **{self.threshold} {unit_display}+** de apoio"
+                conf_view = ConfirmationView(
+                    action_description=description,
+                    confirm_callback=lambda i: view._execute_add_role(i, role, unit, self.threshold, self.time_roles),
+                )
+                embed = discord.Embed(
+                    title="⚠️ Confirmar Ação",
+                    description=f"**Ação:** {description}\n\nLembre de Salvar as Alterações no Botão de Salvar 💾\n\nClique em **CONFIRMAR** para prosseguir.",
+                    color=discord.Color.orange()
+                )
+                await inter.response.send_message(embed=embed, view=conf_view, ephemeral=True)
+            
             unit_display = {"days": "dias", "months": "meses", "years": "anos"}.get(unit, unit)
-            view = TimeRoleSelectView(self.time_roles, self.threshold, unit, options)
+            view = TimeRoleSelectView(
+                self.bot, guild, callback,
+                title=f"🎯 Selecionar Cargo para {self.threshold} {unit_display}+",
+                description="Escolha o cargo que será atribuído aos apoiadores com este tempo de apoio.",
+                time_roles=self.time_roles,
+                threshold=self.threshold,
+                unit=unit
+            )
             embed = discord.Embed(
                 title=f"🎯 Selecionar Cargo para {self.threshold} {unit_display}+",
-                description="Escolha o cargo que será atribuído aos apoiadores com pelo menos este tempo de apoio.",
+                description="Navegue pelas páginas para encontrar o cargo desejado. Cargos com padrões de tempo aparecem primeiro.",
                 color=discord.Color.blue()
             )
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao selecionar unidade: {e}")
 
 
-class TimeRoleSelectView(ui.View):
-    def __init__(self, time_roles, threshold, unit, options):
-        super().__init__()
+class TimeRoleSelectView(PaginatedRoleSelectView):
+    def __init__(self, bot, guild: discord.Guild, callback, title: str, description: str, time_roles, threshold, unit):
         self.time_roles = time_roles
         self.threshold = threshold
         self.unit = unit
-
-        unit_display = {"days": "dias", "months": "meses", "years": "anos"}.get(unit, unit)
-        self.select_menu = ui.Select(
-            placeholder=f"Selecione cargo para {threshold} {unit_display}+",
-            min_values=1, max_values=1, options=options
-        )
-        self.select_menu.callback = self.role_selected
-        self.add_item(self.select_menu)
-
-    async def role_selected(self, interaction: discord.Interaction):
+        super().__init__(bot, guild, callback, title, description, filter_time_patterns=True)
+    
+    @staticmethod
+    async def _execute_add_role(interaction: discord.Interaction, role: discord.Role, unit: str, threshold: int, time_roles: list):
         try:
-            role_id = self.select_menu.values[0]
-            role = interaction.guild.get_role(int(role_id))
-            if not role:
-                await interaction.response.send_message("❌ Cargo não encontrado.", ephemeral=True)
-                return
-
-            unit_display = {"days": "dias", "months": "meses", "years": "anos"}.get(self.unit, self.unit)
-            description = f"Adicionar cargo **{role.name}** para apoiadores com **{self.threshold} {unit_display}+** de apoio"
-            view = ConfirmationView(
-                action_description=description,
-                confirm_callback=lambda i: self._execute_add_role(i, role_id, role),
-            )
-            embed = discord.Embed(
-                title="⚠️ Confirmar Ação",
-                description=f"**Ação:** {description}\n\nLembre de Salvar as Alterações no Botão de Salvar 💾\n\nClique em **CONFIRMAR** para prosseguir.",
-                color=discord.Color.orange()
-            )
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
-
-    async def _execute_add_role(self, interaction: discord.Interaction, role_id: str, role: discord.Role):
-        # interaction já deferida — usar apenas followup
-        try:
-            self.time_roles.append({
-                "threshold": self.threshold,
-                "unit": self.unit,
-                "role_id": role_id
+            time_roles.append({
+                "threshold": threshold,
+                "unit": unit,
+                "role_id": str(role.id)
             })
-            unit_display = {"days": "dias", "months": "meses", "years": "anos"}.get(self.unit, self.unit)
+            unit_display = {"days": "dias", "months": "meses", "years": "anos"}.get(unit, unit)
             embed = discord.Embed(
                 title="✅ Cargo Adicionado",
                 color=discord.Color.green(),
-                description=f"Cargo **{role.name}** configurado para apoiadores com **{self.threshold} {unit_display}+** de apoio"
+                description=f"Cargo **{role.name}** configurado para apoiadores com **{threshold} {unit_display}+** de apoio"
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:

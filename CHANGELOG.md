@@ -7,6 +7,13 @@ e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [1.12.7] - 2026-04-24
 
+### Adicionado
+
+- **Paginação de Cargos na Configuração**:
+  - Suporte a servidores com 100+ cargos (paginação com botões ⬅️ / ➡️)
+  - Filtro inteligente de padrões de tempo ao configurar cargos (reconhece: números, "dia", "mês", "ano", "semana", etc)
+  - Menu reutilizável `PaginatedRoleSelectView` para todas as seleções de cargo
+
 ### Correções
 
 - **Suporte de timezone em cálculo de tempo de apoio**:
