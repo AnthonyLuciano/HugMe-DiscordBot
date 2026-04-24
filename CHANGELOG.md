@@ -5,6 +5,14 @@ Todas as mudanças importantes no HugMe serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.12.7] - 2026-04-24
+
+### Correções
+
+- **Suporte de timezone em cálculo de tempo de apoio**:
+  - Normaliza `data_inicio` para UTC quando o valor do banco não possui timezone
+  - Evita erro `can't subtract offset-naive and offset-aware datetimes` em `SupporterRoleManager`
+
 ## [1.12.6] - 2026-04-22
 
 ### Adicionado

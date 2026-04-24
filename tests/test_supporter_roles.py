@@ -238,6 +238,29 @@ class TestSupporterRoleManager:
             assert days == 0
 
     @pytest.mark.asyncio
+    async def test_calculate_supporter_days_with_naive_datetime(self, role_manager):
+        """Test calculating days when data_inicio is naive datetime"""
+        naive_date = datetime.now() - timedelta(days=5)
+        mock_apo = MagicMock()
+        mock_apo.discord_id = "123"
+        mock_apo.guild_id = "456"
+        mock_apo.data_inicio = naive_date
+        mock_apo.ativo = True
+
+        with patch('bot.servicos.SupporterRoleManager.AsyncSessionLocal') as mock_session_local:
+            mock_session_instance = AsyncMock()
+            mock_session_local.return_value.__aenter__.return_value = mock_session_instance
+
+            mock_result = MagicMock()
+            mock_scalars = MagicMock()
+            mock_scalars.all.return_value = [mock_apo]
+            mock_result.scalars.return_value = mock_scalars
+            mock_session_instance.execute.return_value = mock_result
+
+            days = await role_manager.calculate_total_support_time("123", "456")
+            assert days >= 5
+
+    @pytest.mark.asyncio
     async def test_get_time_based_role_empty_config(self, role_manager, mock_member):
         """Test getting time role with empty config"""
         config = MagicMock()

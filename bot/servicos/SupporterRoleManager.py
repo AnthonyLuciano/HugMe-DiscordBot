@@ -65,8 +65,12 @@ class SupporterRoleManager:
 
                 for apo in apoiadores:
                     if apo.data_inicio:
-                        # Calcula dias desde o início do apoio
-                        days_supported = (now - apo.data_inicio).days
+                        # Converte datetimes sem timezone para UTC antes de subtrair
+                        data_inicio = apo.data_inicio
+                        if data_inicio.tzinfo is None:
+                            data_inicio = data_inicio.replace(tzinfo=timezone.utc)
+
+                        days_supported = (now - data_inicio).days
                         total_days += max(0, days_supported)
 
                 return total_days
