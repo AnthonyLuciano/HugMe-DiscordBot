@@ -553,7 +553,7 @@ class PaginatedRoleSelectView(ui.View):
         self.add_item(self._create_prev_button())
         
         # Información de página
-        total_pages = (len(self.roles) + self.page_size - 1) // self.page_size
+        total_pages = max(1, (len(self.roles) + self.page_size - 1) // self.page_size)
         page_label = f"Página {self.current_page + 1}/{total_pages}"
         page_button = ui.Button(label=page_label, style=discord.ButtonStyle.gray, disabled=True)
         self.add_item(page_button)
@@ -696,7 +696,7 @@ class TimeRoleConfigView(ui.View):
             await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
             return
         try:
-            await interaction.response.send_modal(TimeRoleModal(self.time_roles))
+            await interaction.response.send_modal(TimeRoleModal(self.bot, self.time_roles))
         except Exception as e:
             await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
 
@@ -784,8 +784,9 @@ class TimeRoleModal(ui.Modal, title="Adicionar Cargo por Tempo"):
         max_length=4
     )
 
-    def __init__(self, time_roles):
+    def __init__(self, bot, time_roles):
         super().__init__()
+        self.bot = bot
         self.time_roles = time_roles
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -795,7 +796,7 @@ class TimeRoleModal(ui.Modal, title="Adicionar Cargo por Tempo"):
                 await interaction.response.send_message("❌ Valor deve ser maior que 0.", ephemeral=True)
                 return
 
-            view = TimeUnitSelectView(self.time_roles, threshold)
+            view = TimeUnitSelectView(self.bot, self.time_roles, threshold)
             embed = discord.Embed(
                 title=f"⏱️ Selecionar Unidade para {threshold}+",
                 description="Escolha a unidade de tempo para este limite de apoio.",
@@ -807,8 +808,9 @@ class TimeRoleModal(ui.Modal, title="Adicionar Cargo por Tempo"):
 
 
 class TimeUnitSelectView(ui.View):
-    def __init__(self, time_roles, threshold):
+    def __init__(self, bot, time_roles, threshold):
         super().__init__()
+        self.bot = bot
         self.time_roles = time_roles
         self.threshold = threshold
 
@@ -845,11 +847,10 @@ class TimeUnitSelectView(ui.View):
             unit_display = {"days": "dias", "months": "meses", "years": "anos"}.get(unit, unit)
             view = TimeRoleSelectView(
                 self.bot, guild, callback,
+                self.time_roles, self.threshold, unit,
                 title=f"🎯 Selecionar Cargo para {self.threshold} {unit_display}+",
                 description="Escolha o cargo que será atribuído aos apoiadores com este tempo de apoio.",
-                time_roles=self.time_roles,
-                threshold=self.threshold,
-                unit=unit
+                filter_time_patterns=False
             )
             embed = discord.Embed(
                 title=f"🎯 Selecionar Cargo para {self.threshold} {unit_display}+",
@@ -863,11 +864,11 @@ class TimeUnitSelectView(ui.View):
 
 
 class TimeRoleSelectView(PaginatedRoleSelectView):
-    def __init__(self, bot, guild: discord.Guild, callback, title: str, description: str, time_roles, threshold, unit):
+    def __init__(self, bot, guild: discord.Guild, callback, time_roles, threshold, unit, title: str = "", description: str = "", filter_time_patterns: bool = False):
         self.time_roles = time_roles
         self.threshold = threshold
         self.unit = unit
-        super().__init__(bot, guild, callback, title, description, filter_time_patterns=True)
+        super().__init__(bot, guild, callback, title, description, filter_time_patterns=filter_time_patterns)
     
     @staticmethod
     async def _execute_add_role(interaction: discord.Interaction, role: discord.Role, unit: str, threshold: int, time_roles: list):

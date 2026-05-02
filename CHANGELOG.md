@@ -5,6 +5,16 @@ Todas as mudanças importantes no HugMe serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.12.8] - 2026-05-02
+
+### Correções
+
+- **Configuração de Cargos por Tempo**:
+  - Corrigido erro `'TimeUnitSelectView' object has no attribute 'bot'` ao selecionar unidade de tempo
+  - Passagem correta do objeto `bot` através da cadeia `TimeRoleConfigView` → `TimeRoleModal` → `TimeUnitSelectView`
+  - Removida filtragem restritiva de padrões de tempo - agora permite selecionar qualquer cargo do servidor
+  - Corrigido cálculo de páginas para evitar exibir "Página 1/0" quando não há cargos
+
 ## [1.12.7] - 2026-04-24
 
 ### Adicionado
