@@ -242,7 +242,7 @@ class ConfirmationView(ui.View):
 
 class DashboardView(ui.View):
     def __init__(self, bot, cog):
-        super().__init__()
+        super().__init__(timeout=None)  # Never timeout to allow long-term use
         self.bot = bot
         self.cog = cog
 
@@ -257,181 +257,241 @@ class DashboardView(ui.View):
 
     @ui.button(label="🔄 Atualizar", style=discord.ButtonStyle.primary)
     async def refresh(self, interaction: discord.Interaction, button: ui.Button):
-        if not await self.check_owner(interaction):
-            return
         try:
-            await interaction.response.defer(ephemeral=True)
-            stats = await self.cog._get_dashboard_stats()
+            if not await self.check_owner(interaction):
+                return
+            try:
+                await interaction.response.defer(ephemeral=True)
+                stats = await self.cog._get_dashboard_stats()
 
-            embed = discord.Embed(
-                title="📊 Painel de Controle - HugMe Bot (ATUALIZADO)",
-                color=discord.Color.blue(),
-                timestamp=datetime.now(timezone.utc)
-            )
-            embed.add_field(name="👥 Apoiadores Ativos", value=f"{stats['total_apoiadores']}", inline=True)
-            embed.add_field(name="🆕 Doações Recentes (30d)", value=f"{stats['recentes']}", inline=True)
-            embed.add_field(name="💰 Receita Total", value=f"R$ {stats['receita_total']:.2f}", inline=True)
-            embed.add_field(name="🏠 Servidores", value=f"{stats['total_servidores']}", inline=True)
+                embed = discord.Embed(
+                    title="📊 Painel de Controle - HugMe Bot (ATUALIZADO)",
+                    color=discord.Color.blue(),
+                    timestamp=datetime.now(timezone.utc)
+                )
+                embed.add_field(name="👥 Apoiadores Ativos", value=f"{stats['total_apoiadores']}", inline=True)
+                embed.add_field(name="🆕 Doações Recentes (30d)", value=f"{stats['recentes']}", inline=True)
+                embed.add_field(name="💰 Receita Total", value=f"R$ {stats['receita_total']:.2f}", inline=True)
+                embed.add_field(name="🏠 Servidores", value=f"{stats['total_servidores']}", inline=True)
 
-            view = DashboardView(self.bot, self.cog)
-            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
-            logger.info(f"Dashboard atualizado por {interaction.user}")
-        except Exception as e:
-            await interaction.followup.send(f"❌ Erro ao atualizar: {str(e)}", ephemeral=True)
-            logger.error(f"Erro ao atualizar dashboard: {e}")
+                view = DashboardView(self.bot, self.cog)
+                await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+                logger.info(f"Dashboard atualizado por {interaction.user}")
+            except Exception as e:
+                await interaction.followup.send(f"❌ Erro ao atualizar: {str(e)}", ephemeral=True)
+                logger.error(f"Erro ao atualizar dashboard: {e}")
+        except (discord.NotFound, discord.HTTPException) as e:
+            if hasattr(e, 'code') and e.code == 10062:  # Interaction expired
+                try:
+                    await interaction.user.send("A sessão do painel expirou após 15 minutos. Execute o comando `/dashboard` novamente para uma nova sessão.")
+                except discord.Forbidden:
+                    logger.warning(f"Não foi possível enviar DM para {interaction.user} sobre expiração da sessão")
+            else:
+                logger.error(f"Erro inesperado no refresh: {e}")
 
     @ui.button(label="👤 Gerenciar Apoiadores", style=discord.ButtonStyle.primary)
     async def manage_supporters(self, interaction: discord.Interaction, button: ui.Button):
-        if not await self.check_owner(interaction):
-            return
         try:
-            embed = discord.Embed(
-                title="👤 Gerenciar Apoiadores Manualmente",
-                description="Gerencie apoiadores que fazem doações fora do sistema automático "
-                            "(como apoia-se).\n\n**Ações disponíveis:**\n"
-                            "• **Adicionar**: Cria ou estende apoio manual\n"
-                            "• **Pausar**: Interrompe temporariamente o apoio\n"
-                            "• **Continuar**: Retoma apoio pausado\n"
-                            "• **Remover**: Remove completamente do sistema",
-                color=discord.Color.blue()
-            )
-            embed.add_field(
-                name="📝 Como usar",
-                value="1. Clique no botão abaixo\n"
-                      "2. Digite o ID do usuário ou @menção\n"
-                      "3. Escolha a ação\n"
-                      "4. Para 'adicionar', especifique os meses\n"
-                      "5. Opcional: tipo de apoio (padrão: manual)",
-                inline=False
-            )
+            if not await self.check_owner(interaction):
+                return
+            try:
+                embed = discord.Embed(
+                    title="👤 Gerenciar Apoiadores Manualmente",
+                    description="Gerencie apoiadores que fazem doações fora do sistema automático "
+                                "(como apoia-se).\n\n**Ações disponíveis:**\n"
+                                "• **Adicionar**: Cria ou estende apoio manual\n"
+                                "• **Pausar**: Interrompe temporariamente o apoio\n"
+                                "• **Continuar**: Retoma apoio pausado\n"
+                                "• **Remover**: Remove completamente do sistema",
+                    color=discord.Color.blue()
+                )
+                embed.add_field(
+                    name="📝 Como usar",
+                    value="1. Clique no botão abaixo\n"
+                          "2. Digite o ID do usuário ou @menção\n"
+                          "3. Escolha a ação\n"
+                          "4. Para 'adicionar', especifique os meses\n"
+                          "5. Opcional: tipo de apoio (padrão: manual)",
+                    inline=False
+                )
 
-            view = ManageSupporterView(self.bot, self.cog.role_manager)
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-            logger.info(f"Gerenciamento de apoiadores aberto para {interaction.user}")
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
-            logger.error(f"Erro ao abrir gerenciamento de apoiadores: {e}")
+                view = ManageSupporterView(self.bot, self.cog.role_manager)
+                await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+                logger.info(f"Gerenciamento de apoiadores aberto para {interaction.user}")
+            except Exception as e:
+                await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+                logger.error(f"Erro ao abrir gerenciamento de apoiadores: {e}")
+        except (discord.NotFound, discord.HTTPException) as e:
+            if hasattr(e, 'code') and e.code == 10062:
+                try:
+                    await interaction.user.send("A sessão do painel expirou após 15 minutos. Execute o comando `/dashboard` novamente para uma nova sessão.")
+                except discord.Forbidden:
+                    logger.warning(f"Não foi possível enviar DM para {interaction.user} sobre expiração da sessão")
+            else:
+                logger.error(f"Erro inesperado em manage_supporters: {e}")
 
     @ui.button(label="📋 Apoiadores", style=discord.ButtonStyle.secondary)
     async def view_supporters(self, interaction: discord.Interaction, button: ui.Button):
-        if not await self.check_owner(interaction):
-            return
         try:
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    select(Apoiador).where(Apoiador.ativo == True).limit(10)
-                )
-                apoiadores = result.scalars().all()
-
-            if not apoiadores:
-                await interaction.response.send_message("📝 Nenhum apoiador ativo.", ephemeral=True)
+            if not await self.check_owner(interaction):
                 return
+            try:
+                async with AsyncSessionLocal() as session:
+                    result = await session.execute(
+                        select(Apoiador).where(Apoiador.ativo == True)
+                        .order_by(Apoiador.ultimo_pagamento.desc())
+                    )
+                    all_apoiadores = result.scalars().all()
 
-            embed = discord.Embed(title="👥 Últimos 10 Apoiadores", color=discord.Color.gold())
-            supporter_list = []
-            for apo in apoiadores:
-                expiry = apo.data_expiracao.strftime("%d/%m/%Y") if apo.data_expiracao else "Permanente"
-                supporter_list.append(f"**{apo.discord_id}** - {apo.tipo_apoio} Nível {apo.nivel} (Expira: {expiry})")
+                if not all_apoiadores:
+                    await interaction.response.send_message("📝 Nenhum apoiador ativo.", ephemeral=True)
+                    return
 
-            embed.description = "\n".join(supporter_list)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
-            logger.error(f"Erro ao listar apoiadores: {e}")
+                # Criar view paginada para mostrar todos os apoiadores
+                view = SupportersPaginationView(all_apoiadores)
+                embed = view.get_embed()
+                await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+                logger.error(f"Erro ao listar apoiadores: {e}")
+        except (discord.NotFound, discord.HTTPException) as e:
+            if hasattr(e, 'code') and e.code == 10062:
+                try:
+                    await interaction.user.send("A sessão do painel expirou após 15 minutos. Execute o comando `/dashboard` novamente para uma nova sessão.")
+                except discord.Forbidden:
+                    logger.warning(f"Não foi possível enviar DM para {interaction.user} sobre expiração da sessão")
+            else:
+                logger.error(f"Erro inesperado em view_supporters: {e}")
 
     @ui.button(label="🏠 Servidores", style=discord.ButtonStyle.secondary)
     async def view_servers(self, interaction: discord.Interaction, button: ui.Button):
-        if not await self.check_owner(interaction):
-            return
         try:
-            embed = discord.Embed(
-                title="🏠 Servidores do Bot",
-                color=discord.Color.green(),
-                timestamp=datetime.now(timezone.utc)
-            )
-            server_list = []
-            for guild in self.bot.guilds:
-                member_count = guild.member_count or 0
-                server_list.append(f"**{guild.name}** (ID: {guild.id}) - {member_count} membros")
+            if not await self.check_owner(interaction):
+                return
+            try:
+                embed = discord.Embed(
+                    title="🏠 Servidores do Bot",
+                    color=discord.Color.green(),
+                    timestamp=datetime.now(timezone.utc)
+                )
+                server_list = []
+                for guild in self.bot.guilds:
+                    member_count = guild.member_count or 0
+                    server_list.append(f"**{guild.name}** (ID: {guild.id}) - {member_count} membros")
 
-            embed.description = "\n".join(server_list[:15]) if server_list else "Nenhum servidor encontrado."
-            embed.set_footer(text=f"Total: {len(self.bot.guilds)} servidores")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            logger.info(f"Lista de servidores exibida para {interaction.user}")
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
-            logger.error(f"Erro ao listar servidores: {e}")
+                embed.description = "\n".join(server_list[:15]) if server_list else "Nenhum servidor encontrado."
+                embed.set_footer(text=f"Total: {len(self.bot.guilds)} servidores")
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                logger.info(f"Lista de servidores exibida para {interaction.user}")
+            except Exception as e:
+                await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+                logger.error(f"Erro ao listar servidores: {e}")
+        except (discord.NotFound, discord.HTTPException) as e:
+            if hasattr(e, 'code') and e.code == 10062:
+                try:
+                    await interaction.user.send("A sessão do painel expirou após 15 minutos. Execute o comando `/dashboard` novamente para uma nova sessão.")
+                except discord.Forbidden:
+                    logger.warning(f"Não foi possível enviar DM para {interaction.user} sobre expiração da sessão")
+            else:
+                logger.error(f"Erro inesperado em view_servers: {e}")
 
     @ui.button(label="💳 PIX Config", style=discord.ButtonStyle.primary)
     async def pix_config_button(self, interaction: discord.Interaction, button: ui.Button):
-        if not await self.check_owner(interaction):
-            return
         try:
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(select(PixConfig))
-                config = result.scalars().first()
-
-            if not config:
-                embed = discord.Embed(
-                    title="⚠️ Configuração PIX não encontrada",
-                    description="Clique em ✏️ Editar para criar uma nova configuração",
-                    color=discord.Color.orange()
-                )
-                await interaction.response.send_message(embed=embed, view=PIXConfigView(), ephemeral=True)
+            if not await self.check_owner(interaction):
                 return
+            try:
+                async with AsyncSessionLocal() as session:
+                    result = await session.execute(select(PixConfig))
+                    config = result.scalars().first()
 
-            embed = discord.Embed(
-                title="💳 Configuração PIX",
-                color=discord.Color.purple(),
-                timestamp=datetime.now(timezone.utc)
-            )
-            embed.add_field(name="Chave PIX", value=config.chave, inline=False)
-            embed.add_field(name="Nome do Titular", value=config.nome_titular, inline=True)
-            embed.add_field(name="Cidade", value=config.cidade, inline=True)
-            if config.static_qr_url:
-                embed.add_field(name="QR Code", value=f"[Ver QR Code]({config.static_qr_url})", inline=False)
-            embed.add_field(name="Atualizado em", value=config.atualizado_em.strftime("%d/%m/%Y %H:%M"), inline=True)
-            embed.add_field(name="Atualizado por", value=config.atualizado_por or "Desconhecido", inline=True)
+                if not config:
+                    embed = discord.Embed(
+                        title="⚠️ Configuração PIX não encontrada",
+                        description="Clique em ✏️ Editar para criar uma nova configuração",
+                        color=discord.Color.orange()
+                    )
+                    await interaction.response.send_message(embed=embed, view=PIXConfigView(), ephemeral=True)
+                    return
 
-            await interaction.response.send_message(embed=embed, view=PIXConfigView(), ephemeral=True)
-            logger.info(f"PIX config mostrada para {interaction.user}")
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
-            logger.error(f"Erro ao mostrar PIX config: {e}")
+                embed = discord.Embed(
+                    title="💳 Configuração PIX",
+                    color=discord.Color.purple(),
+                    timestamp=datetime.now(timezone.utc)
+                )
+                embed.add_field(name="Chave PIX", value=config.chave, inline=False)
+                embed.add_field(name="Nome do Titular", value=config.nome_titular, inline=True)
+                embed.add_field(name="Cidade", value=config.cidade, inline=True)
+                if config.static_qr_url:
+                    embed.add_field(name="QR Code", value=f"[Ver QR Code]({config.static_qr_url})", inline=False)
+                embed.add_field(name="Atualizado em", value=config.atualizado_em.strftime("%d/%m/%Y %H:%M"), inline=True)
+                embed.add_field(name="Atualizado por", value=config.atualizado_por or "Desconhecido", inline=True)
+
+                await interaction.response.send_message(embed=embed, view=PIXConfigView(), ephemeral=True)
+                logger.info(f"PIX config mostrada para {interaction.user}")
+            except Exception as e:
+                await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+                logger.error(f"Erro ao mostrar PIX config: {e}")
+        except (discord.NotFound, discord.HTTPException) as e:
+            if hasattr(e, 'code') and e.code == 10062:
+                try:
+                    await interaction.user.send("A sessão do painel expirou após 15 minutos. Execute o comando `/dashboard` novamente para uma nova sessão.")
+                except discord.Forbidden:
+                    logger.warning(f"Não foi possível enviar DM para {interaction.user} sobre expiração da sessão")
+            else:
+                logger.error(f"Erro inesperado em pix_config_button: {e}")
 
     @ui.button(label="⭐ Ver Cargos Configurados", style=discord.ButtonStyle.primary)
     async def view_role_config(self, interaction: discord.Interaction, button: ui.Button):
-        if not await self.check_owner(interaction):
-            return
-        if not interaction.guild:
-            await interaction.response.send_message("❌ Este comando só funciona em um servidor.", ephemeral=True)
-            return
         try:
-            guild_id = str(interaction.guild.id)
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    select(GuildConfig).where(GuildConfig.guild_id == guild_id)
-                )
-                config = result.scalars().first()
+            if not await self.check_owner(interaction):
+                return
+            if not interaction.guild:
+                await interaction.response.send_message("❌ Este comando só funciona em um servidor.", ephemeral=True)
+                return
+            try:
+                guild_id = str(interaction.guild.id)
+                async with AsyncSessionLocal() as session:
+                    result = await session.execute(
+                        select(GuildConfig).where(GuildConfig.guild_id == guild_id)
+                    )
+                    config = result.scalars().first()
 
-            embed = _build_role_config_embed(interaction.guild, config)
-            view = RoleConfigView(self.bot, interaction.guild)
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-            logger.info(f"Configuração de cargos mostrada para {interaction.user}")
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Erro ao mostrar configuração: {str(e)}", ephemeral=True)
-            logger.error(f"Erro ao mostrar configuração de cargos: {e}")
+                embed = _build_role_config_embed(interaction.guild, config)
+                view = RoleConfigView(self.bot, interaction.guild)
+                await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+                logger.info(f"Configuração de cargos mostrada para {interaction.user}")
+            except Exception as e:
+                await interaction.response.send_message(f"❌ Erro ao mostrar configuração: {str(e)}", ephemeral=True)
+                logger.error(f"Erro ao mostrar configuração de cargos: {e}")
+        except (discord.NotFound, discord.HTTPException) as e:
+            if hasattr(e, 'code') and e.code == 10062:
+                try:
+                    await interaction.user.send("A sessão do painel expirou após 15 minutos. Execute o comando `/dashboard` novamente para uma nova sessão.")
+                except discord.Forbidden:
+                    logger.warning(f"Não foi possível enviar DM para {interaction.user} sobre expiração da sessão")
+            else:
+                logger.error(f"Erro inesperado em view_role_config: {e}")
 
     @ui.button(label="✏️ PIX Modal", style=discord.ButtonStyle.success)
     async def set_qrcode_button(self, interaction: discord.Interaction, button: ui.Button):
-        if not await self.check_owner(interaction):
-            return
         try:
-            await interaction.response.send_modal(SetQRCodeModal())
-            logger.info(f"Modal PIX aberto para {interaction.user}")
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
-            logger.error(f"Erro ao abrir modal PIX: {e}")
+            if not await self.check_owner(interaction):
+                return
+            try:
+                await interaction.response.send_modal(SetQRCodeModal())
+                logger.info(f"Modal PIX aberto para {interaction.user}")
+            except Exception as e:
+                await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+                logger.error(f"Erro ao abrir modal PIX: {e}")
+        except (discord.NotFound, discord.HTTPException) as e:
+            if hasattr(e, 'code') and e.code == 10062:
+                try:
+                    await interaction.user.send("A sessão do painel expirou após 15 minutos. Execute o comando `/dashboard` novamente para uma nova sessão.")
+                except discord.Forbidden:
+                    logger.warning(f"Não foi possível enviar DM para {interaction.user} sobre expiração da sessão")
+            else:
+                logger.error(f"Erro inesperado em set_qrcode_button: {e}")
 
 
 # ==================== HELPERS ====================
@@ -690,12 +750,26 @@ class TimeRoleConfigView(ui.View):
         self.guild = guild
         self.time_roles = []
 
+    async def _load_time_roles(self):
+        try:
+            guild_id = str(self.guild.id)
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(GuildConfig).where(GuildConfig.guild_id == guild_id)
+                )
+                config = result.scalars().first()
+                self.time_roles = config.cargos_tempo if config and config.cargos_tempo else []
+        except Exception as e:
+            logger.error(f"Erro ao carregar cargos de tempo existentes: {e}")
+            self.time_roles = []
+
     @ui.button(label="➕ Adicionar Cargo", style=discord.ButtonStyle.primary)
     async def add_time_role_button(self, interaction: discord.Interaction, button: ui.Button):
         if not check_is_owner(interaction):
             await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
             return
         try:
+            await self._load_time_roles()
             await interaction.response.send_modal(TimeRoleModal(self.bot, self.time_roles))
         except Exception as e:
             await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
@@ -706,6 +780,7 @@ class TimeRoleConfigView(ui.View):
             await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
             return
         try:
+            await self._load_time_roles()
             if not self.time_roles:
                 embed = discord.Embed(
                     title="📋 Cargos de Tempo Configurados",
@@ -726,53 +801,6 @@ class TimeRoleConfigView(ui.View):
         except Exception as e:
             await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
 
-    @ui.button(label="💾 Salvar Configuração", style=discord.ButtonStyle.success)
-    async def save_time_config_button(self, interaction: discord.Interaction, button: ui.Button):
-        if not check_is_owner(interaction):
-            await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
-            return
-        try:
-            num_roles = len(self.time_roles)
-            description = f"Salvar configuração de {num_roles} cargo(s) baseado(s) no tempo de apoio para {self.guild.name}"
-            view = ConfirmationView(
-                action_description=description,
-                confirm_callback=lambda i: self._execute_save_config(i),
-            )
-            embed = discord.Embed(
-                title="⚠️ Confirmar Ação",
-                description=f"**Ação:** {description}\n\nClique em **CONFIRMAR** para prosseguir.",
-                color=discord.Color.orange()
-            )
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
-            logger.error(f"Erro ao preparar salvamento de cargos de tempo: {e}")
-
-    async def _execute_save_config(self, interaction: discord.Interaction):
-        # interaction já deferida — usar apenas followup
-        try:
-            guild_id = str(self.guild.id)
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    select(GuildConfig).where(GuildConfig.guild_id == guild_id)
-                )
-                config = result.scalars().first()
-                if not config:
-                    config = GuildConfig(guild_id=guild_id)
-                    session.add(config)
-                config.cargos_tempo = self.time_roles
-                await session.commit()
-
-            embed = discord.Embed(
-                title="✅ Configuração Salva",
-                color=discord.Color.green(),
-                description=f"Configurados {len(self.time_roles)} cargos baseados no tempo de apoio"
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
-            logger.info(f"Cargos de tempo salvos por {interaction.user}: {self.time_roles}")
-        except Exception as e:
-            await interaction.followup.send(f"❌ Erro ao salvar: {str(e)}", ephemeral=True)
-            logger.error(f"Erro ao salvar cargos de tempo: {e}")
 
 
 class TimeRoleModal(ui.Modal, title="Adicionar Cargo por Tempo"):
@@ -839,7 +867,7 @@ class TimeUnitSelectView(ui.View):
                 )
                 embed = discord.Embed(
                     title="⚠️ Confirmar Ação",
-                    description=f"**Ação:** {description}\n\nLembre de Salvar as Alterações no Botão de Salvar 💾\n\nClique em **CONFIRMAR** para prosseguir.",
+                    description=f"**Ação:** {description}\n\nAs alterações serão salvas automaticamente após a confirmação.\n\nClique em **CONFIRMAR** para prosseguir.",
                     color=discord.Color.orange()
                 )
                 await inter.response.send_message(embed=embed, view=conf_view, ephemeral=True)
@@ -878,9 +906,23 @@ class TimeRoleSelectView(PaginatedRoleSelectView):
                 "unit": unit,
                 "role_id": str(role.id)
             })
+            guild = interaction.guild
+            if guild:
+                guild_id = str(guild.id)
+                async with AsyncSessionLocal() as session:
+                    result = await session.execute(
+                        select(GuildConfig).where(GuildConfig.guild_id == guild_id)
+                    )
+                    config = result.scalars().first()
+                    if not config:
+                        config = GuildConfig(guild_id=guild_id)
+                        session.add(config)
+                    config.cargos_tempo = time_roles
+                    await session.commit()
+
             unit_display = {"days": "dias", "months": "meses", "years": "anos"}.get(unit, unit)
             embed = discord.Embed(
-                title="✅ Cargo Adicionado",
+                title="✅ Cargo Adicionado e Salvo",
                 color=discord.Color.green(),
                 description=f"Cargo **{role.name}** configurado para apoiadores com **{threshold} {unit_display}+** de apoio"
             )
@@ -1069,13 +1111,14 @@ class AdminCommands(commands.Cog):
 
                 if action == 'adicionar':
                     if not apoiador:
+                        data_inicio = now - timedelta(days=months * 30)
                         data_expiracao = now + timedelta(days=months * 30)
                         apoiador = Apoiador(
                             discord_id=discord_id,
                             guild_id=guild_id,
                             tipo_apoio=tipo_apoio,
                             duracao_meses=months,
-                            data_inicio=now,
+                            data_inicio=data_inicio,
                             ultimo_pagamento=now,
                             ativo=True,
                             data_expiracao=data_expiracao,
@@ -1200,6 +1243,10 @@ class AdminCommands(commands.Cog):
             await ctx.send("❌ Apenas admins podem usar esse comando!", ephemeral=True)
             return
         try:
+            # ✅ Defer imediato para evitar timeout de 3s do Discord
+            if ctx.interaction:
+                await ctx.interaction.response.defer(ephemeral=True)
+
             stats = await self._get_dashboard_stats()
 
             embed = discord.Embed(
@@ -1215,13 +1262,13 @@ class AdminCommands(commands.Cog):
 
             view = DashboardView(self.bot, self)
             if ctx.interaction:
-                await ctx.interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+                await ctx.interaction.followup.send(embed=embed, view=view, ephemeral=True)
             else:
                 await ctx.send(embed=embed, view=view)
             logger.info(f"Dashboard exibido para {ctx.author}")
         except Exception as e:
             if ctx.interaction:
-                await ctx.interaction.response.send_message(f"❌ Erro ao carregar dashboard: {str(e)}", ephemeral=True)
+                await ctx.interaction.followup.send(f"❌ Erro ao carregar dashboard: {str(e)}", ephemeral=True)
             else:
                 await ctx.send(f"❌ Erro ao carregar dashboard: {str(e)}")
             logger.error(f"Erro no dashboard: {e}")
@@ -1309,6 +1356,9 @@ class AdminCommands(commands.Cog):
             await ctx.send("❌ Apenas admins podem usar esse comando!", ephemeral=True)
             return
         try:
+            if ctx.interaction:
+                await ctx.interaction.response.defer(ephemeral=True)
+                
             async with AsyncSessionLocal() as session:
                 result = await session.execute(select(PixConfig))
                 config = result.scalars().first()
@@ -1372,6 +1422,88 @@ class AdminCommands(commands.Cog):
             logger.error(f"Erro ao abrir gerenciamento de apoiador: {e}")
 
 
+class SupportersPaginationView(ui.View):
+    """View para mostrar apoiadores com paginação"""
+    def __init__(self, apoiadores, per_page=8):
+        super().__init__(timeout=300)  # 5 minutos de timeout
+        self.apoiadores = apoiadores
+        self.per_page = per_page
+        self.current_page = 0
+        self.total_pages = max(1, (len(apoiadores) + per_page - 1) // per_page)
+        self.update_buttons()
+
+    def update_buttons(self):
+        """Atualiza os botões de navegação"""
+        # Remove botões antigos
+        for item in list(self.children):
+            if isinstance(item, ui.Button):
+                self.remove_item(item)
+
+        # Botão anterior
+        prev_button = ui.Button(label="⬅️ Anterior", style=discord.ButtonStyle.primary)
+        prev_button.callback = self.prev_page
+        prev_button.disabled = self.current_page == 0
+        self.add_item(prev_button)
+
+        # Info da página
+        page_info = ui.Button(
+            label=f"Página {self.current_page + 1}/{self.total_pages} ({len(self.apoiadores)} total)",
+            style=discord.ButtonStyle.gray,
+            disabled=True
+        )
+        self.add_item(page_info)
+
+        # Botão próximo
+        next_button = ui.Button(label="Próximo ➡️", style=discord.ButtonStyle.primary)
+        next_button.callback = self.next_page
+        next_button.disabled = self.current_page >= self.total_pages - 1
+        self.add_item(next_button)
+
+    def get_embed(self):
+        """Cria o embed para a página atual"""
+        start_idx = self.current_page * self.per_page
+        end_idx = min(start_idx + self.per_page, len(self.apoiadores))
+        page_apoiadores = self.apoiadores[start_idx:end_idx]
+
+        embed = discord.Embed(
+            title=f"👥 Apoiadores Ativos - Página {self.current_page + 1}/{self.total_pages}",
+            color=discord.Color.gold(),
+            timestamp=datetime.now(timezone.utc)
+        )
+
+        if not page_apoiadores:
+            embed.description = "Nenhum apoiador nesta página."
+            return embed
+
+        supporter_list = []
+        for apo in page_apoiadores:
+            expiry = apo.data_expiracao.strftime("%d/%m/%Y") if apo.data_expiracao else "Permanente"
+            inicio = apo.data_inicio.strftime("%d/%m/%Y") if apo.data_inicio else "Desconhecida"
+            supporter_list.append(
+                f"**<@{apo.discord_id}>**\n"
+                f"└ {apo.tipo_apoio} • Nível {apo.nivel} • Início: `{inicio}` • Expira: `{expiry}`"
+            )
+
+        embed.description = "\n\n".join(supporter_list)
+        embed.set_footer(text=f"Mostrando {start_idx + 1}-{end_idx} de {len(self.apoiadores)} apoiadores")
+
+        return embed
+
+    async def prev_page(self, interaction: discord.Interaction):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.update_buttons()
+            embed = self.get_embed()
+            await interaction.response.edit_message(embed=embed, view=self)
+
+    async def next_page(self, interaction: discord.Interaction):
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+            self.update_buttons()
+            embed = self.get_embed()
+            await interaction.response.edit_message(embed=embed, view=self)
+
+
 # ==================== SUPPORTER MANAGEMENT VIEWS ====================
 
 class SupporterActionModal(ui.Modal):
@@ -1384,7 +1516,7 @@ class SupporterActionModal(ui.Modal):
     meses = ui.TextInput(
         label="Meses (apenas para adicionar)",
         placeholder="5",
-        required=False,
+        required=True,
         max_length=3
     )
     tipo = ui.TextInput(
@@ -1414,35 +1546,22 @@ class SupporterActionModal(ui.Modal):
                 await interaction.response.send_message("❌ ID de usuário inválido.", ephemeral=True)
                 return
 
-            action = self.action
-            months = None
-            if action == 'adicionar':
-                if not self.meses.value:
-                    await interaction.response.send_message("❌ Para adicionar, informe os meses.", ephemeral=True)
+            try:
+                months = int(str(self.meses).strip())
+                if months <= 0:
+                    await interaction.response.send_message("❌ Número de meses deve ser maior que 0.", ephemeral=True)
                     return
-                try:
-                    months = int(str(self.meses).strip())
-                    if months <= 0:
-                        await interaction.response.send_message("❌ Meses deve ser maior que 0.", ephemeral=True)
-                        return
-                except ValueError:
-                    await interaction.response.send_message("❌ Número de meses inválido.", ephemeral=True)
-                    return
+            except ValueError:
+                await interaction.response.send_message("❌ Número de meses inválido.", ephemeral=True)
+                return
 
             tipo_apoio = str(self.tipo).strip() or "manual"
 
-            action_descriptions = {
-                'adicionar': f"Adicionar/estender apoio de <@{discord_id}> por {months} meses (tipo: {tipo_apoio})",
-                'pausar': f"Pausar apoio de <@{discord_id}> (interromper doações)",
-                'continuar': f"Continuar apoio de <@{discord_id}> (retomar doações)",
-                'remover': f"REMOVER COMPLETAMENTE o apoio de <@{discord_id}> do sistema"
-            }
-
-            description = action_descriptions.get(action, f"Executar ação '{action}' para <@{discord_id}>")
+            description = f"Adicionar/estender apoio de <@{discord_id}> por {months} meses (tipo: {tipo_apoio})"
 
             view = ConfirmationView(
                 action_description=description,
-                confirm_callback=lambda i: self._execute_action(i, discord_id, action, months, tipo_apoio),
+                confirm_callback=lambda i: self._execute_add_action(i, discord_id, months, tipo_apoio),
             )
 
             embed = discord.Embed(
@@ -1457,7 +1576,7 @@ class SupporterActionModal(ui.Modal):
             await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
             logger.error(f"Erro ao processar ação de apoiador: {e}")
 
-    async def _execute_action(self, interaction: discord.Interaction, discord_id: str, action: str, months: int = None, tipo_apoio: str = "manual"):
+    async def _execute_add_action(self, interaction: discord.Interaction, discord_id: str, months: int, tipo_apoio: str):
         # interaction já deferida pela ConfirmationView — usar apenas followup
         try:
             guild_id = str(interaction.guild.id)
@@ -1472,96 +1591,335 @@ class SupporterActionModal(ui.Modal):
                 apoiador = result.scalars().first()
                 now = datetime.now(timezone.utc)
 
-                if action == 'adicionar':
-                    if not apoiador:
-                        apoiador = Apoiador(
-                            discord_id=discord_id,
-                            guild_id=guild_id,
-                            tipo_apoio=tipo_apoio,
-                            duracao_meses=months,
-                            data_inicio=now,
-                            ultimo_pagamento=now,
-                            ativo=True,
-                            data_expiracao=now + timedelta(days=months * 30),
-                            cargo_atribuido=False,
-                            ja_pago=True
-                        )
-                        session.add(apoiador)
-                        message = f"✅ Apoiador criado: {months} meses de {tipo_apoio}"
-                    else:
-                        if apoiador.ativo:
-                            if apoiador.data_expiracao:
-                                apoiador.data_expiracao += timedelta(days=months * 30)
-                            else:
-                                apoiador.data_expiracao = now + timedelta(days=months * 30)
-                            apoiador.duracao_meses = (apoiador.duracao_meses or 0) + months
-                            apoiador.ultimo_pagamento = now
-                            message = f"✅ Apoiador estendido: +{months} meses (total: {apoiador.duracao_meses} meses)"
-                        else:
-                            apoiador.ativo = True
-                            apoiador.data_expiracao = now + timedelta(days=months * 30)
-                            apoiador.duracao_meses = months
-                            apoiador.ultimo_pagamento = now
-                            message = f"✅ Apoiador reativado: {months} meses de {tipo_apoio}"
-
-                elif action == 'pausar':
-                    if not apoiador or not apoiador.ativo:
-                        await interaction.followup.send("❌ Apoiador não encontrado ou já inativo.", ephemeral=True)
-                        return
-                    apoiador.ativo = False
-                    message = "✅ Apoiador pausado (doações interrompidas)"
-
-                elif action == 'continuar':
-                    if not apoiador:
-                        await interaction.followup.send("❌ Apoiador não encontrado.", ephemeral=True)
-                        return
+                if not apoiador:
+                    apoiador = Apoiador(
+                        discord_id=discord_id,
+                        guild_id=guild_id,
+                        data_inicio=now - timedelta(days=months * 30),  # Começar no passado
+                        data_expiracao=now + timedelta(days=months * 30),
+                        valor_doacao=0,  # Será atualizado por webhooks
+                        tipo_apoio=tipo_apoio,
+                        ativo=True,
+                        ultimo_pagamento=now,
+                        nivel=1
+                    )
+                    session.add(apoiador)
+                    message = f"✅ Novo apoiador adicionado com {months} meses de apoio retroativo"
+                else:
                     if apoiador.ativo:
-                        await interaction.followup.send("❌ Apoiador já está ativo.", ephemeral=True)
-                        return
-                    apoiador.ativo = True
-                    apoiador.ultimo_pagamento = now
-                    message = "✅ Apoiador reativado (doações continuadas)"
-
-                elif action == 'remover':
-                    if not apoiador:
-                        await interaction.followup.send("❌ Apoiador não encontrado.", ephemeral=True)
-                        return
-                    await session.delete(apoiador)
-                    message = "✅ Apoiador removido do sistema"
+                        # Estender apoio existente
+                        if apoiador.data_expiracao:
+                            apoiador.data_expiracao += timedelta(days=months * 30)
+                        else:
+                            apoiador.data_expiracao = now + timedelta(days=months * 30)
+                        message = f"✅ Apoio estendido por mais {months} meses"
+                    else:
+                        # Reativar e estender
+                        apoiador.ativo = True
+                        apoiador.data_expiracao = now + timedelta(days=months * 30)
+                        apoiador.ultimo_pagamento = now
+                        message = f"✅ Apoiador reativado e apoio estendido por {months} meses"
 
                 await session.commit()
 
             try:
                 member = interaction.guild.get_member(int(discord_id))
                 if member:
-                    if action in ['adicionar', 'continuar']:
-                        await self.role_manager.assign_default_supporter_role(member)
-                        await self.role_manager.update_member_time_based_roles(member)
-                    else:
-                        config = await self.role_manager.get_guild_config(guild_id)
-                        if config and config.cargo_apoiador_default:
-                            role = interaction.guild.get_role(int(config.cargo_apoiador_default))
-                            if role and role in member.roles:
-                                await member.remove_roles(role)
+                    await self.role_manager.assign_default_supporter_role(member)
+                    await self.role_manager.update_member_time_based_roles(member)
             except Exception as e:
                 logger.error(f"Erro ao atualizar cargos: {e}")
 
             embed = discord.Embed(
-                title="✅ Apoiador Gerenciado",
+                title="✅ Apoiador Adicionado/Estendido",
                 color=discord.Color.green(),
                 description=message
             )
             embed.add_field(name="Usuário", value=f"<@{discord_id}>", inline=True)
-            embed.add_field(name="Ação", value=action.title(), inline=True)
-            if months:
-                embed.add_field(name="Meses", value=str(months), inline=True)
+            embed.add_field(name="Meses Adicionados", value=str(months), inline=True)
+            embed.add_field(name="Tipo", value=tipo_apoio, inline=True)
 
             await interaction.followup.send(embed=embed, ephemeral=True)
-            logger.info(f"Apoiador gerenciado por {interaction.user}: {discord_id} - {action}")
+            logger.info(f"Apoiador adicionado/estendido por {interaction.user}: {discord_id} - {months} meses")
 
         except Exception as e:
             await interaction.followup.send(f"❌ Erro ao executar ação: {str(e)}", ephemeral=True)
             logger.error(f"Erro ao executar ação de apoiador: {e}")
+
+
+class SupporterPauseModal(ui.Modal, title="Pausar Apoiador"):
+    usuario = ui.TextInput(
+        label="ID do Usuário ou @menção",
+        placeholder="123456789 ou @usuario",
+        required=True,
+        max_length=50
+    )
+
+    def __init__(self, role_manager):
+        self.role_manager = role_manager
+        super().__init__()
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            user_input = str(self.usuario).strip()
+            if user_input.startswith('<@') and user_input.endswith('>'):
+                user_id = user_input.replace('<@', '').replace('>', '').replace('!', '')
+            else:
+                user_id = user_input
+
+            try:
+                discord_id = str(int(user_id))
+            except ValueError:
+                await interaction.response.send_message("❌ ID de usuário inválido.", ephemeral=True)
+                return
+
+            description = f"Pausar apoio de <@{discord_id}> (interromper doações)"
+
+            view = ConfirmationView(
+                action_description=description,
+                confirm_callback=lambda i: self._execute_pause_action(i, discord_id),
+            )
+
+            embed = discord.Embed(
+                title="⚠️ Confirmar Ação",
+                description=f"**Ação:** {description}\n\nClique em **CONFIRMAR** para prosseguir.",
+                color=discord.Color.orange()
+            )
+
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao processar pausa de apoiador: {e}")
+
+    async def _execute_pause_action(self, interaction: discord.Interaction, discord_id: str):
+        try:
+            guild_id = str(interaction.guild.id)
+
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(Apoiador).where(
+                        Apoiador.discord_id == discord_id,
+                        Apoiador.guild_id == guild_id
+                    )
+                )
+                apoiador = result.scalars().first()
+
+                if not apoiador or not apoiador.ativo:
+                    await interaction.followup.send("❌ Apoiador não encontrado ou já está pausado.", ephemeral=True)
+                    return
+
+                apoiador.ativo = False
+                await session.commit()
+
+            try:
+                member = interaction.guild.get_member(int(discord_id))
+                if member:
+                    config = await self.role_manager.get_guild_config(guild_id)
+                    if config and config.cargo_apoiador_default:
+                        role = interaction.guild.get_role(int(config.cargo_apoiador_default))
+                        if role and role in member.roles:
+                            await member.remove_roles(role)
+            except Exception as e:
+                logger.error(f"Erro ao remover cargo: {e}")
+
+            embed = discord.Embed(
+                title="✅ Apoiador Pausado",
+                color=discord.Color.green(),
+                description="✅ Apoiador pausado (doações interrompidas)"
+            )
+            embed.add_field(name="Usuário", value=f"<@{discord_id}>", inline=True)
+
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            logger.info(f"Apoiador pausado por {interaction.user}: {discord_id}")
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ Erro ao executar pausa: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao executar pausa de apoiador: {e}")
+
+
+class SupporterResumeModal(ui.Modal, title="Continuar Apoiador"):
+    usuario = ui.TextInput(
+        label="ID do Usuário ou @menção",
+        placeholder="123456789 ou @usuario",
+        required=True,
+        max_length=50
+    )
+
+    def __init__(self, role_manager):
+        self.role_manager = role_manager
+        super().__init__()
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            user_input = str(self.usuario).strip()
+            if user_input.startswith('<@') and user_input.endswith('>'):
+                user_id = user_input.replace('<@', '').replace('>', '').replace('!', '')
+            else:
+                user_id = user_input
+
+            try:
+                discord_id = str(int(user_id))
+            except ValueError:
+                await interaction.response.send_message("❌ ID de usuário inválido.", ephemeral=True)
+                return
+
+            description = f"Continuar apoio de <@{discord_id}> (retomar doações)"
+
+            view = ConfirmationView(
+                action_description=description,
+                confirm_callback=lambda i: self._execute_resume_action(i, discord_id),
+            )
+
+            embed = discord.Embed(
+                title="⚠️ Confirmar Ação",
+                description=f"**Ação:** {description}\n\nClique em **CONFIRMAR** para prosseguir.",
+                color=discord.Color.orange()
+            )
+
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao processar continuação de apoiador: {e}")
+
+    async def _execute_resume_action(self, interaction: discord.Interaction, discord_id: str):
+        try:
+            guild_id = str(interaction.guild.id)
+            now = datetime.now(timezone.utc)
+
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(Apoiador).where(
+                        Apoiador.discord_id == discord_id,
+                        Apoiador.guild_id == guild_id
+                    )
+                )
+                apoiador = result.scalars().first()
+
+                if not apoiador:
+                    await interaction.followup.send("❌ Apoiador não encontrado.", ephemeral=True)
+                    return
+                if apoiador.ativo:
+                    await interaction.followup.send("❌ Apoiador já está ativo.", ephemeral=True)
+                    return
+
+                apoiador.ativo = True
+                apoiador.ultimo_pagamento = now
+                await session.commit()
+
+            try:
+                member = interaction.guild.get_member(int(discord_id))
+                if member:
+                    await self.role_manager.assign_default_supporter_role(member)
+                    await self.role_manager.update_member_time_based_roles(member)
+            except Exception as e:
+                logger.error(f"Erro ao atualizar cargos: {e}")
+
+            embed = discord.Embed(
+                title="✅ Apoiador Reativado",
+                color=discord.Color.green(),
+                description="✅ Apoiador reativado (doações continuadas)"
+            )
+            embed.add_field(name="Usuário", value=f"<@{discord_id}>", inline=True)
+
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            logger.info(f"Apoiador reativado por {interaction.user}: {discord_id}")
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ Erro ao executar continuação: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao executar continuação de apoiador: {e}")
+
+
+class SupporterRemoveModal(ui.Modal, title="Remover Apoiador"):
+    usuario = ui.TextInput(
+        label="ID do Usuário ou @menção",
+        placeholder="123456789 ou @usuario",
+        required=True,
+        max_length=50
+    )
+
+    def __init__(self, role_manager):
+        self.role_manager = role_manager
+        super().__init__()
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            user_input = str(self.usuario).strip()
+            if user_input.startswith('<@') and user_input.endswith('>'):
+                user_id = user_input.replace('<@', '').replace('>', '').replace('!', '')
+            else:
+                user_id = user_input
+
+            try:
+                discord_id = str(int(user_id))
+            except ValueError:
+                await interaction.response.send_message("❌ ID de usuário inválido.", ephemeral=True)
+                return
+
+            description = f"REMOVER COMPLETAMENTE o apoio de <@{discord_id}> do sistema"
+
+            view = ConfirmationView(
+                action_description=description,
+                confirm_callback=lambda i: self._execute_remove_action(i, discord_id),
+            )
+
+            embed = discord.Embed(
+                title="⚠️ Confirmar Ação",
+                description=f"**Ação:** {description}\n\n**⚠️ ATENÇÃO:** Esta ação não pode ser desfeita!\n\nClique em **CONFIRMAR** para prosseguir.",
+                color=discord.Color.red()
+            )
+
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao processar remoção de apoiador: {e}")
+
+    async def _execute_remove_action(self, interaction: discord.Interaction, discord_id: str):
+        try:
+            guild_id = str(interaction.guild.id)
+
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(
+                    select(Apoiador).where(
+                        Apoiador.discord_id == discord_id,
+                        Apoiador.guild_id == guild_id
+                    )
+                )
+                apoiador = result.scalars().first()
+
+                if not apoiador:
+                    await interaction.followup.send("❌ Apoiador não encontrado.", ephemeral=True)
+                    return
+
+                await session.delete(apoiador)
+                await session.commit()
+
+            try:
+                member = interaction.guild.get_member(int(discord_id))
+                if member:
+                    config = await self.role_manager.get_guild_config(guild_id)
+                    if config and config.cargo_apoiador_default:
+                        role = interaction.guild.get_role(int(config.cargo_apoiador_default))
+                        if role and role in member.roles:
+                            await member.remove_roles(role)
+            except Exception as e:
+                logger.error(f"Erro ao remover cargo: {e}")
+
+            embed = discord.Embed(
+                title="✅ Apoiador Removido",
+                color=discord.Color.green(),
+                description="✅ Apoiador removido do sistema"
+            )
+            embed.add_field(name="Usuário", value=f"<@{discord_id}>", inline=True)
+
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            logger.info(f"Apoiador removido por {interaction.user}: {discord_id}")
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ Erro ao executar remoção: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao executar remoção de apoiador: {e}")
 
 
 class ManageSupporterActionView(ui.View):
@@ -1569,36 +1927,33 @@ class ManageSupporterActionView(ui.View):
         super().__init__()
         self.role_manager = role_manager
 
-    async def _open_modal(self, interaction: discord.Interaction, action: str, title: str):
-        await interaction.response.send_modal(SupporterActionModal(self.role_manager, action, title))
-
     @ui.button(label="➕ Adicionar", style=discord.ButtonStyle.success)
     async def add_supporter(self, interaction: discord.Interaction, button: ui.Button):
         if not check_is_owner(interaction):
             await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
             return
-        await self._open_modal(interaction, 'adicionar', 'Adicionar Apoiador')
+        await interaction.response.send_modal(SupporterActionModal(self.role_manager, 'adicionar', 'Adicionar Apoiador'))
 
     @ui.button(label="⏸️ Pausar", style=discord.ButtonStyle.secondary)
     async def pause_supporter(self, interaction: discord.Interaction, button: ui.Button):
         if not check_is_owner(interaction):
             await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
             return
-        await self._open_modal(interaction, 'pausar', 'Pausar Apoiador')
+        await interaction.response.send_modal(SupporterPauseModal(self.role_manager))
 
     @ui.button(label="▶️ Continuar", style=discord.ButtonStyle.primary)
     async def continue_supporter(self, interaction: discord.Interaction, button: ui.Button):
         if not check_is_owner(interaction):
             await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
             return
-        await self._open_modal(interaction, 'continuar', 'Continuar Apoiador')
+        await interaction.response.send_modal(SupporterResumeModal(self.role_manager))
 
     @ui.button(label="🗑️ Remover", style=discord.ButtonStyle.danger)
     async def remove_supporter(self, interaction: discord.Interaction, button: ui.Button):
         if not check_is_owner(interaction):
             await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
             return
-        await self._open_modal(interaction, 'remover', 'Remover Apoiador')
+        await interaction.response.send_modal(SupporterRemoveModal(self.role_manager))
 
 
 class ManageSupporterView(ui.View):

@@ -5,6 +5,54 @@ Todas as mudanças importantes no HugMe serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.12.9] - 2026-05-06
+
+### Melhorias
+
+- **Sistema de Modais de Apoiadores**:
+  - Refatorado sistema de modais para usar classes específicas por ação
+  - Criados `SupporterPauseModal`, `SupporterResumeModal`, `SupporterRemoveModal` para melhor UX
+  - Modal de adicionar mantido como `SupporterActionModal` (único que requer campos adicionais)
+  - Campos obrigatórios reduzidos por modal - apenas o necessário para cada ação
+  - Confirmação visual aprimorada com cores específicas por tipo de ação
+  - Mensagens de erro mais específicas por operação
+
+- **Interface de Administração**:
+  - Fluxo simplificado para configuração de cargos por tempo
+  - **Listagem de Apoiadores**: Implementada paginação para visualizar todos os apoiadores ativos (removido limite de 10)
+  - Confirmação imediata de alterações salvas
+  - Lista de apoiadores mostra corretamente entradas manuais
+
+### Correções
+
+- **Interface de Administração**:
+  - Corrigido limite de 10 apoiadores no botão do dashboard (implementada paginação)
+  - `SupportersPaginationView` adicionada para navegação completa de apoiadores
+  - Timeout desabilitado em views administrativas para uso prolongado
+
+### Correções
+
+- **Painel de Administração**:
+  - Corrigido falha de interação após expiração da sessão (15 minutos)
+  - Tratamento de interações expiradas com notificação via DM
+  - Views com timeout desabilitado para uso prolongado
+
+- **Configuração de Ambiente**:
+  - Corrigido erro de inicialização `ValueError: Missing BASE_URL configuration`
+  - `BASE_URL` agora usa `REDIRECT_URL` (produção) ou `NGROK_URL` (desenvolvimento)
+  - Mensagem de erro aprimorada para indicar `REDIRECT_URL/NGROK_URL`
+
+- **Gerenciamento Manual de Apoiadores**:
+  - Corrigido cálculo de tempo de apoio para apoiadores adicionados manualmente
+  - `data_inicio` agora definido no passado baseado nos meses informados
+  - Suporte histórico correto para roles baseadas em tempo de apoio
+
+- **Configuração de Cargos por Tempo**:
+  - Salvamento automático ao confirmar adição de cargo (removido botão separado 💾)
+  - Carregamento de configurações existentes antes de adicionar novas regras
+  - Texto de confirmação atualizado para informar salvamento automático
+
+
 ## [1.12.8] - 2026-05-02
 
 ### Correções

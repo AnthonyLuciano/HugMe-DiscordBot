@@ -28,13 +28,13 @@ class Config:
     # Detecção de ambiente
     USE_NGROK = getenv('USE_NGROK', 'false').lower() == 'true'
     NGROK_URL = getenv('NGROK_URL', '')
-    FLY_URL = getenv('FLY_URL', '')
-    BASE_URL = NGROK_URL if USE_NGROK else FLY_URL
+    REDIRECT_URL = getenv('REDIRECT_URL', '')
+    BASE_URL = NGROK_URL if USE_NGROK else REDIRECT_URL
 
     def __init__(self):
         if not all([self.DISCORD_TOKEN, self.DEEP_KEY, self.DATABASE_URL]):
             raise ValueError("Missing required environment variables")
         if not self.BASE_URL:
-            raise ValueError("Missing BASE_URL configuration")
+            raise ValueError("Missing REDIRECT_URL/NGROK_URL configuration")
 
 config = Config()
