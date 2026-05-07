@@ -121,8 +121,8 @@ class WeeklyRoleCheck(commands.Cog):
 
             if stats['time_based_roles']:
                 time_roles_text = ""
-                for days, role_info in sorted(stats['time_based_roles'].items()):
-                    time_roles_text += f"**{days} dias+**: {role_info['role_name']} ({role_info['member_count']} membros)\n"
+                for months, role_info in sorted(stats['time_based_roles'].items()):
+                    time_roles_text += f"**{months} meses+**: {role_info['role_name']} ({role_info['member_count']} membros)\n"
 
                 embed.add_field(
                     name="⏳ Cargos por Tempo de Apoio",

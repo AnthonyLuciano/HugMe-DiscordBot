@@ -5,6 +5,12 @@ Todas as mudanças importantes no HugMe serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.12.9.1] - 2026-05-07
+
+### Correções
+
+- Corrigido bug de indentação em `bot/commands/admin.py` no fluxo de criação/estensão de apoiadores manuais, restaurando a atualização de cargos após o commit.
+
 ## [1.12.9] - 2026-05-06
 
 ### Melhorias

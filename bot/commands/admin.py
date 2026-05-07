@@ -3,6 +3,7 @@ import logging
 import os
 import re
 from datetime import datetime, timedelta, timezone
+from dateutil.relativedelta import relativedelta
 
 from discord import ui
 from discord.ext import commands
@@ -1111,8 +1112,8 @@ class AdminCommands(commands.Cog):
 
                 if action == 'adicionar':
                     if not apoiador:
-                        data_inicio = now - timedelta(days=months * 30)
-                        data_expiracao = now + timedelta(days=months * 30)
+                        data_inicio = now - relativedelta(months=months)
+                        data_expiracao = now + relativedelta(months=1)
                         apoiador = Apoiador(
                             discord_id=discord_id,
                             guild_id=guild_id,
@@ -1126,19 +1127,19 @@ class AdminCommands(commands.Cog):
                             ja_pago=True
                         )
                         session.add(apoiador)
-                        message = f"✅ Apoiador criado: {months} meses de {tipo_apoio}"
+                        message = f"✅ Apoiador criado com {months} meses retroativos e expira em 1 mês"
                     else:
                         if apoiador.ativo:
                             if apoiador.data_expiracao:
-                                apoiador.data_expiracao += timedelta(days=months * 30)
+                                apoiador.data_expiracao += relativedelta(months=months)
                             else:
-                                apoiador.data_expiracao = now + timedelta(days=months * 30)
+                                apoiador.data_expiracao = now + relativedelta(months=months)
                             apoiador.duracao_meses = (apoiador.duracao_meses or 0) + months
                             apoiador.ultimo_pagamento = now
                             message = f"✅ Apoiador estendido: +{months} meses (total: {apoiador.duracao_meses} meses)"
                         else:
                             apoiador.ativo = True
-                            apoiador.data_expiracao = now + timedelta(days=months * 30)
+                            apoiador.data_expiracao = now + relativedelta(months=months)
                             apoiador.duracao_meses = months
                             apoiador.ultimo_pagamento = now
                             message = f"✅ Apoiador reativado: {months} meses de {tipo_apoio}"
@@ -1513,11 +1514,12 @@ class SupporterActionModal(ui.Modal):
         required=True,
         max_length=50
     )
-    meses = ui.TextInput(
-        label="Meses (apenas para adicionar)",
-        placeholder="5",
+    threshold = ui.TextInput(
+        label="Duração do apoio",
+        placeholder="Ex: 1, 3, 6, 12",
         required=True,
-        max_length=3
+        min_length=1,
+        max_length=4
     )
     tipo = ui.TextInput(
         label="Tipo de Apoio (opcional)",
@@ -1526,11 +1528,16 @@ class SupporterActionModal(ui.Modal):
         required=False,
         max_length=20
     )
+    valor = ui.TextInput(
+        label="Valor do apoio (R$)",
+        placeholder="Ex: 12.50",
+        required=False,
+        max_length=20
+    )
 
-    def __init__(self, role_manager, action: str, title: str):
+    def __init__(self, role_manager):
         self.role_manager = role_manager
-        self.action = action
-        super().__init__(title=title)
+        super().__init__(title="Adicionar Apoiador")
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
@@ -1547,21 +1554,70 @@ class SupporterActionModal(ui.Modal):
                 return
 
             try:
-                months = int(str(self.meses).strip())
-                if months <= 0:
-                    await interaction.response.send_message("❌ Número de meses deve ser maior que 0.", ephemeral=True)
+                threshold = int(str(self.threshold).strip())
+                if threshold <= 0:
+                    await interaction.response.send_message("❌ Duração deve ser maior que 0.", ephemeral=True)
                     return
             except ValueError:
-                await interaction.response.send_message("❌ Número de meses inválido.", ephemeral=True)
+                await interaction.response.send_message("❌ Duração inválida.", ephemeral=True)
                 return
 
             tipo_apoio = str(self.tipo).strip() or "manual"
 
-            description = f"Adicionar/estender apoio de <@{discord_id}> por {months} meses (tipo: {tipo_apoio})"
+            valor_text = str(self.valor).strip()
+            amount_cents = None
+            if valor_text:
+                valor_text = valor_text.replace(',', '.')
+                try:
+                    amount = float(valor_text)
+                    if amount < 0:
+                        raise ValueError("Valor negativo")
+                    amount_cents = int(round(amount * 100))
+                except ValueError:
+                    await interaction.response.send_message("❌ Valor inválido. Use um número como 12.50", ephemeral=True)
+                    return
+
+            view = SupporterUnitSelectView(self.role_manager, threshold, tipo_apoio, discord_id, amount_cents)
+            embed = discord.Embed(
+                title=f"⏱️ Selecionar Unidade para {threshold}+",
+                description="Escolha a unidade de tempo para a duração do apoio.",
+                color=discord.Color.blue()
+            )
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
+            logger.error(f"Erro ao processar ação de apoiador: {e}")
+
+
+class SupporterUnitSelectView(ui.View):
+    def __init__(self, role_manager, threshold, tipo_apoio, discord_id, amount_cents=None):
+        super().__init__()
+        self.role_manager = role_manager
+        self.threshold = threshold
+        self.tipo_apoio = tipo_apoio
+        self.discord_id = discord_id
+        self.amount_cents = amount_cents
+
+    @ui.button(label="📅 Dias", style=discord.ButtonStyle.primary)
+    async def select_days(self, interaction: discord.Interaction, button: ui.Button):
+        await self._select_unit(interaction, "days")
+
+    @ui.button(label="📆 Meses", style=discord.ButtonStyle.primary)
+    async def select_months(self, interaction: discord.Interaction, button: ui.Button):
+        await self._select_unit(interaction, "months")
+
+    @ui.button(label="📈 Anos", style=discord.ButtonStyle.primary)
+    async def select_years(self, interaction: discord.Interaction, button: ui.Button):
+        await self._select_unit(interaction, "years")
+
+    async def _select_unit(self, interaction: discord.Interaction, unit: str):
+        try:
+            description = f"Adicionar/estender apoio de <@{self.discord_id}> por {self.threshold} {unit} (tipo: {self.tipo_apoio})"
 
             view = ConfirmationView(
                 action_description=description,
-                confirm_callback=lambda i: self._execute_add_action(i, discord_id, months, tipo_apoio),
+                confirm_callback=lambda i: self._execute_add_action(i, self.discord_id, self.threshold, unit, self.tipo_apoio, self.amount_cents),
             )
 
             embed = discord.Embed(
@@ -1574,9 +1630,9 @@ class SupporterActionModal(ui.Modal):
 
         except Exception as e:
             await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
-            logger.error(f"Erro ao processar ação de apoiador: {e}")
+            logger.error(f"Erro ao selecionar unidade: {e}")
 
-    async def _execute_add_action(self, interaction: discord.Interaction, discord_id: str, months: int, tipo_apoio: str):
+    async def _execute_add_action(self, interaction: discord.Interaction, discord_id: str, threshold: int, unit: str, tipo_apoio: str, amount_cents: int | None = None):
         # interaction já deferida pela ConfirmationView — usar apenas followup
         try:
             guild_id = str(interaction.guild.id)
@@ -1592,33 +1648,52 @@ class SupporterActionModal(ui.Modal):
                 now = datetime.now(timezone.utc)
 
                 if not apoiador:
+                    data_inicio = now - relativedelta(**{unit: threshold})
+                    data_expiracao = now + relativedelta(months=1)
                     apoiador = Apoiador(
                         discord_id=discord_id,
                         guild_id=guild_id,
-                        data_inicio=now - timedelta(days=months * 30),  # Começar no passado
-                        data_expiracao=now + timedelta(days=months * 30),
-                        valor_doacao=0,  # Será atualizado por webhooks
+                        data_inicio=data_inicio,
+                        data_expiracao=data_expiracao,
+                        valor_doacao=amount_cents or 0,
+                        data_pagamento=now if amount_cents is not None else None,
                         tipo_apoio=tipo_apoio,
                         ativo=True,
                         ultimo_pagamento=now,
                         nivel=1
                     )
                     session.add(apoiador)
-                    message = f"✅ Novo apoiador adicionado com {months} meses de apoio retroativo"
+                    message = f"✅ Novo apoiador adicionado com {threshold} {unit} de apoio retroativo e expira em 1 mês"
+                    if amount_cents is not None:
+                        amount_display = f"R$ {amount_cents / 100:.2f}"
+                        message += f" | Valor informado: {amount_display}"
                 else:
                     if apoiador.ativo:
                         # Estender apoio existente
                         if apoiador.data_expiracao:
-                            apoiador.data_expiracao += timedelta(days=months * 30)
+                            apoiador.data_expiracao += relativedelta(**{unit: threshold})
                         else:
-                            apoiador.data_expiracao = now + timedelta(days=months * 30)
-                        message = f"✅ Apoio estendido por mais {months} meses"
+                            apoiador.data_expiracao = now + relativedelta(**{unit: threshold})
+                        if amount_cents is not None:
+                            apoiador.valor_doacao = (apoiador.valor_doacao or 0) + amount_cents
+                            apoiador.data_pagamento = now
+                        message = f"✅ Apoio estendido por mais {threshold} {unit}"
+                        if amount_cents is not None:
+                            amount_display = f"R$ {amount_cents / 100:.2f}"
+                            message += f" | Valor informado: {amount_display}"
                     else:
                         # Reativar e estender
                         apoiador.ativo = True
-                        apoiador.data_expiracao = now + timedelta(days=months * 30)
+                        apoiador.data_expiracao = now + relativedelta(**{unit: threshold})
+                        apoiador.duracao_meses = threshold
                         apoiador.ultimo_pagamento = now
-                        message = f"✅ Apoiador reativado e apoio estendido por {months} meses"
+                        if amount_cents is not None:
+                            apoiador.valor_doacao = (apoiador.valor_doacao or 0) + amount_cents
+                            apoiador.data_pagamento = now
+                        message = f"✅ Apoiador reativado e apoio estendido por {threshold} {unit}"
+                        if amount_cents is not None:
+                            amount_display = f"R$ {amount_cents / 100:.2f}"
+                            message += f" | Valor informado: {amount_display}"
 
                 await session.commit()
 
@@ -1636,11 +1711,13 @@ class SupporterActionModal(ui.Modal):
                 description=message
             )
             embed.add_field(name="Usuário", value=f"<@{discord_id}>", inline=True)
-            embed.add_field(name="Meses Adicionados", value=str(months), inline=True)
+            embed.add_field(name="Duração Adicionada", value=f"{threshold} {unit}", inline=True)
             embed.add_field(name="Tipo", value=tipo_apoio, inline=True)
+            if amount_cents is not None:
+                embed.add_field(name="Valor Informado", value=f"R$ {amount_cents / 100:.2f}", inline=True)
 
             await interaction.followup.send(embed=embed, ephemeral=True)
-            logger.info(f"Apoiador adicionado/estendido por {interaction.user}: {discord_id} - {months} meses")
+            logger.info(f"Apoiador adicionado/estendido por {interaction.user}: {discord_id} - {threshold} {unit}")
 
         except Exception as e:
             await interaction.followup.send(f"❌ Erro ao executar ação: {str(e)}", ephemeral=True)
@@ -1932,7 +2009,7 @@ class ManageSupporterActionView(ui.View):
         if not check_is_owner(interaction):
             await interaction.response.send_message("❌ Apenas admins podem usar essa função!", ephemeral=True)
             return
-        await interaction.response.send_modal(SupporterActionModal(self.role_manager, 'adicionar', 'Adicionar Apoiador'))
+        await interaction.response.send_modal(SupporterActionModal(self.role_manager))
 
     @ui.button(label="⏸️ Pausar", style=discord.ButtonStyle.secondary)
     async def pause_supporter(self, interaction: discord.Interaction, button: ui.Button):
