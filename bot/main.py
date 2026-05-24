@@ -48,7 +48,7 @@ class HugMeBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.all()
         super().__init__(
-            command_prefix='!',
+            command_prefix='$',
             intents=intents,
             application_id=os.getenv('APPLICATION_ID'),
             help_command=None,

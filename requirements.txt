@@ -13,6 +13,7 @@ authlib
 itsdangerous
 apscheduler
 pymysql
+python-dateutil
 
 # Dependências de teste
 pytest>=7.0.0
