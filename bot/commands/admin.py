@@ -1577,10 +1577,12 @@ class SupporterActionModal(ui.Modal):
                     await interaction.response.send_message("❌ Valor inválido. Use um número como 12.50", ephemeral=True)
                     return
 
-            view = SupporterUnitSelectView(self.role_manager, threshold, tipo_apoio, discord_id, amount_cents)
+            view = SupporterTimeTypeSelectView(self.role_manager, threshold, tipo_apoio, discord_id, amount_cents)
             embed = discord.Embed(
-                title=f"⏱️ Selecionar Unidade para {threshold}+",
-                description="Escolha a unidade de tempo para a duração do apoio.",
+                title="⏰ Tipo de Período de Apoio",
+                description="Escolha se o tempo sendo adicionado é:\n"
+                           "• **Retroativo**: Contabiliza como se já estivesse em vigor (data de início no passado)\n"
+                           "• **Antecipado**: Estende o apoio futuro (próxima data de vencimento)",
                 color=discord.Color.blue()
             )
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
@@ -1590,7 +1592,8 @@ class SupporterActionModal(ui.Modal):
             logger.error(f"Erro ao processar ação de apoiador: {e}")
 
 
-class SupporterUnitSelectView(ui.View):
+class SupporterTimeTypeSelectView(ui.View):
+    """View para selecionar se o tempo é retroativo ou antecipado"""
     def __init__(self, role_manager, threshold, tipo_apoio, discord_id, amount_cents=None):
         super().__init__()
         self.role_manager = role_manager
@@ -1598,6 +1601,45 @@ class SupporterUnitSelectView(ui.View):
         self.tipo_apoio = tipo_apoio
         self.discord_id = discord_id
         self.amount_cents = amount_cents
+
+    @ui.button(label="⏮️ Retroativo", style=discord.ButtonStyle.primary)
+    async def select_retroactive(self, interaction: discord.Interaction, button: ui.Button):
+        """Tempo é retroativo - data de início no passado"""
+        view = SupporterUnitSelectView(
+            self.role_manager, self.threshold, self.tipo_apoio, 
+            self.discord_id, self.amount_cents, time_type="retroative"
+        )
+        embed = discord.Embed(
+            title=f"⏱️ Selecionar Unidade para {self.threshold}+",
+            description="Escolha a unidade de tempo para a duração do apoio retroativo.",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    @ui.button(label="⏭️ Antecipado", style=discord.ButtonStyle.primary)
+    async def select_anticipated(self, interaction: discord.Interaction, button: ui.Button):
+        """Tempo é antecipado - estende para o futuro"""
+        view = SupporterUnitSelectView(
+            self.role_manager, self.threshold, self.tipo_apoio, 
+            self.discord_id, self.amount_cents, time_type="anticipated"
+        )
+        embed = discord.Embed(
+            title=f"⏱️ Selecionar Unidade para {self.threshold}+",
+            description="Escolha a unidade de tempo para estender o apoio para o futuro.",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+class SupporterUnitSelectView(ui.View):
+    def __init__(self, role_manager, threshold, tipo_apoio, discord_id, amount_cents=None, time_type="retroative"):
+        super().__init__()
+        self.role_manager = role_manager
+        self.threshold = threshold
+        self.tipo_apoio = tipo_apoio
+        self.discord_id = discord_id
+        self.amount_cents = amount_cents
+        self.time_type = time_type  # "retroative" ou "anticipated"
 
     @ui.button(label="📅 Dias", style=discord.ButtonStyle.primary)
     async def select_days(self, interaction: discord.Interaction, button: ui.Button):
@@ -1613,11 +1655,12 @@ class SupporterUnitSelectView(ui.View):
 
     async def _select_unit(self, interaction: discord.Interaction, unit: str):
         try:
-            description = f"Adicionar/estender apoio de <@{self.discord_id}> por {self.threshold} {unit} (tipo: {self.tipo_apoio})"
+            time_type_display = "retroativo" if self.time_type == "retroative" else "antecipado"
+            description = f"Adicionar/estender apoio de <@{self.discord_id}> por {self.threshold} {unit} ({time_type_display}, tipo: {self.tipo_apoio})"
 
             view = ConfirmationView(
                 action_description=description,
-                confirm_callback=lambda i: self._execute_add_action(i, self.discord_id, self.threshold, unit, self.tipo_apoio, self.amount_cents),
+                confirm_callback=lambda i: self._execute_add_action(i, self.discord_id, self.threshold, unit, self.tipo_apoio, self.amount_cents, self.time_type),
             )
 
             embed = discord.Embed(
@@ -1632,7 +1675,7 @@ class SupporterUnitSelectView(ui.View):
             await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
             logger.error(f"Erro ao selecionar unidade: {e}")
 
-    async def _execute_add_action(self, interaction: discord.Interaction, discord_id: str, threshold: int, unit: str, tipo_apoio: str, amount_cents: int | None = None):
+    async def _execute_add_action(self, interaction: discord.Interaction, discord_id: str, threshold: int, unit: str, tipo_apoio: str, amount_cents: int | None = None, time_type: str = "retroative"):
         # interaction já deferida pela ConfirmationView — usar apenas followup
         try:
             guild_id = str(interaction.guild.id)
@@ -1648,8 +1691,18 @@ class SupporterUnitSelectView(ui.View):
                 now = datetime.now(timezone.utc)
 
                 if not apoiador:
-                    data_inicio = now - relativedelta(**{unit: threshold})
-                    data_expiracao = now + relativedelta(months=1)
+                    # Novo apoiador
+                    if time_type == "retroative":
+                        # Retroativo: data_inicio no passado
+                        data_inicio = now - relativedelta(**{unit: threshold})
+                        data_expiracao = now + relativedelta(months=1)
+                        type_display = "retroativo"
+                    else:
+                        # Antecipado: data_expiracao no futuro
+                        data_inicio = now
+                        data_expiracao = now + relativedelta(**{unit: threshold})
+                        type_display = "antecipado"
+
                     apoiador = Apoiador(
                         discord_id=discord_id,
                         guild_id=guild_id,
@@ -1663,34 +1716,53 @@ class SupporterUnitSelectView(ui.View):
                         nivel=1
                     )
                     session.add(apoiador)
-                    message = f"✅ Novo apoiador adicionado com {threshold} {unit} de apoio retroativo e expira em 1 mês"
+                    message = f"✅ Novo apoiador adicionado com {threshold} {unit} de apoio {type_display}"
                     if amount_cents is not None:
                         amount_display = f"R$ {amount_cents / 100:.2f}"
                         message += f" | Valor informado: {amount_display}"
                 else:
                     if apoiador.ativo:
                         # Estender apoio existente
-                        if apoiador.data_expiracao:
-                            apoiador.data_expiracao += relativedelta(**{unit: threshold})
+                        if time_type == "retroative":
+                            # Retroativo: ajusta data_inicio para trás
+                            if apoiador.data_inicio:
+                                apoiador.data_inicio -= relativedelta(**{unit: threshold})
+                            type_display = "retroativo"
                         else:
-                            apoiador.data_expiracao = now + relativedelta(**{unit: threshold})
+                            # Antecipado: estende data_expiracao
+                            if apoiador.data_expiracao:
+                                apoiador.data_expiracao += relativedelta(**{unit: threshold})
+                            else:
+                                apoiador.data_expiracao = now + relativedelta(**{unit: threshold})
+                            type_display = "antecipado"
+
                         if amount_cents is not None:
                             apoiador.valor_doacao = (apoiador.valor_doacao or 0) + amount_cents
                             apoiador.data_pagamento = now
-                        message = f"✅ Apoio estendido por mais {threshold} {unit}"
+                        message = f"✅ Apoio estendido por mais {threshold} {unit} ({type_display})"
                         if amount_cents is not None:
                             amount_display = f"R$ {amount_cents / 100:.2f}"
                             message += f" | Valor informado: {amount_display}"
                     else:
                         # Reativar e estender
                         apoiador.ativo = True
-                        apoiador.data_expiracao = now + relativedelta(**{unit: threshold})
+                        if time_type == "retroative":
+                            # Retroativo: data_inicio no passado
+                            apoiador.data_inicio = now - relativedelta(**{unit: threshold})
+                            apoiador.data_expiracao = now + relativedelta(months=1)
+                            type_display = "retroativo"
+                        else:
+                            # Antecipado: estende para o futuro
+                            apoiador.data_inicio = now
+                            apoiador.data_expiracao = now + relativedelta(**{unit: threshold})
+                            type_display = "antecipado"
+
                         apoiador.duracao_meses = threshold
                         apoiador.ultimo_pagamento = now
                         if amount_cents is not None:
                             apoiador.valor_doacao = (apoiador.valor_doacao or 0) + amount_cents
                             apoiador.data_pagamento = now
-                        message = f"✅ Apoiador reativado e apoio estendido por {threshold} {unit}"
+                        message = f"✅ Apoiador reativado e apoio estendido por {threshold} {unit} ({type_display})"
                         if amount_cents is not None:
                             amount_display = f"R$ {amount_cents / 100:.2f}"
                             message += f" | Valor informado: {amount_display}"
@@ -1712,12 +1784,13 @@ class SupporterUnitSelectView(ui.View):
             )
             embed.add_field(name="Usuário", value=f"<@{discord_id}>", inline=True)
             embed.add_field(name="Duração Adicionada", value=f"{threshold} {unit}", inline=True)
-            embed.add_field(name="Tipo", value=tipo_apoio, inline=True)
+            embed.add_field(name="Tipo de Tempo", value="⏮️ Retroativo" if time_type == "retroative" else "⏭️ Antecipado", inline=True)
+            embed.add_field(name="Tipo de Apoio", value=tipo_apoio, inline=True)
             if amount_cents is not None:
                 embed.add_field(name="Valor Informado", value=f"R$ {amount_cents / 100:.2f}", inline=True)
 
             await interaction.followup.send(embed=embed, ephemeral=True)
-            logger.info(f"Apoiador adicionado/estendido por {interaction.user}: {discord_id} - {threshold} {unit}")
+            logger.info(f"Apoiador adicionado/estendido por {interaction.user}: {discord_id} - {threshold} {unit} ({time_type})")
 
         except Exception as e:
             await interaction.followup.send(f"❌ Erro ao executar ação: {str(e)}", ephemeral=True)
