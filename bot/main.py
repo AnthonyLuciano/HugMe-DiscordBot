@@ -73,14 +73,27 @@ class HugMeBot(commands.Bot):
             # Inicializa o banco de dados async
             await init_db()
 
-            # Carrega todos os cogs
-            for filename in os.listdir('./bot/commands'):
-                if filename.endswith('.py') and not filename.startswith('_'):
-                    try:
-                        await self.load_extension(f'bot.commands.{filename[:-3]}')
-                        logger.info(f"Extensão '{filename}' carregada com sucesso")
-                    except Exception as e:
-                        logger.error(f"Erro ao carregar cog {filename}: {e}")
+            # Carrega todos os cogs e pacotes de comandos
+            for entry in os.listdir('./bot/commands'):
+                if entry.startswith('_'):
+                    continue
+
+                path = os.path.join('./bot/commands', entry)
+                module_name = None
+
+                if os.path.isdir(path) and os.path.isfile(os.path.join(path, '__init__.py')):
+                    module_name = f'bot.commands.{entry}'
+                elif entry.endswith('.py'):
+                    module_name = f'bot.commands.{entry[:-3]}'
+
+                if not module_name:
+                    continue
+
+                try:
+                    await self.load_extension(module_name)
+                    logger.info(f"Extensão '{module_name}' carregada com sucesso")
+                except Exception as e:
+                    logger.error(f"Erro ao carregar cog {module_name}: {e}")
 
             # Tenta iniciar servidor web (não deve falhar o setup_hook se falhar)
             try:

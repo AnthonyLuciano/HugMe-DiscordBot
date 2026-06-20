@@ -45,7 +45,7 @@ class SupporterRoleManager:
             return False
 
     async def calculate_total_support_time(self, discord_id: str, guild_id: str) -> int:
-        """Calcula tempo total de apoio em dias"""
+        """Calcula tempo total de apoio em dias, considerando retroativo e antecipado"""
         try:
             async with AsyncSessionLocal() as session:
                 result = await session.execute(
@@ -61,16 +61,21 @@ class SupporterRoleManager:
                     return 0
 
                 total_days = 0
-                now = datetime.now(timezone.utc)
 
                 for apo in apoiadores:
-                    if apo.data_inicio:
+                    if apo.data_inicio and apo.data_expiracao:
                         # Converte datetimes sem timezone para UTC antes de subtrair
                         data_inicio = apo.data_inicio
+                        data_expiracao = apo.data_expiracao
+                        
                         if data_inicio.tzinfo is None:
                             data_inicio = data_inicio.replace(tzinfo=timezone.utc)
+                        if data_expiracao.tzinfo is None:
+                            data_expiracao = data_expiracao.replace(tzinfo=timezone.utc)
 
-                        days_supported = (now - data_inicio).days
+                        # Calcula o tempo TOTAL entre data_inicio e data_expiracao
+                        # Isso considera tanto apoio retroativo quanto antecipado
+                        days_supported = (data_expiracao - data_inicio).days
                         total_days += max(0, days_supported)
 
                 return total_days

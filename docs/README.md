@@ -32,6 +32,8 @@ Bem-vindo à documentação do HugMe! Aqui você encontrará todas as informaç�
 ### Comandos
 
 - [Comandos do Bot](commands/commands.md) - Lista completa de comandos
+- [Admin Package](admin/README.md) - Documentação técnica detalhada do pacote admin
+- [Admin - Guia de Uso](admin/GUIDE.md) - Guia prático para administradores
 
 ## Arquitetura
 

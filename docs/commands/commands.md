@@ -58,20 +58,60 @@
   await self.verificador.tempo_servidor(member)
   ```
 
-### [ADMIN] Admin (`admin.py`)
+### [ADMIN] Admin (`bot/commands/admin/`)
 
-- **Comandos Privilegiados**:
-  - `/set_qrcode [url]`: Atualiza QR Code PIX
-  - `/manage_supporter`: Gerencia apoiadores manualmente
-  - `/verificarcargo [cargo_id] [dias]`: Cria botão de verificação
-  - Validações:
-    - URL deve começar com `http(s)://`
-    - Acesso restrito a donos do bot (`@is_owner()`)
-- **Gerenciamento de Apoiadores**:
-  - Adicionar meses de apoio manual
-  - Pausar/continuar doações
-  - Remover apoiadores
-  - Suporte a doações externas (apoia-se, etc.)
+Pacote modularizado para gerenciamento administrativo do bot com suporte completo a PIX, cargos e apoiadores.
+
+**Estrutura**:
+- `cog.py` - Classe principal `AdminCommands` e comandos slash/hybrid
+- `utils.py` - Funções auxiliares (`check_is_owner`, `_build_role_config_embed`)
+- `modals_pix.py` - Modais para configuração PIX (`SetQRCodeModal`, `ConfigureRoleModal`, `ConfirmationModal`)
+- `views_base.py` - Views base (`ConfirmView`, `ConfirmationView`)
+- `views_dashboard.py` - Dashboard (`DashboardView`, `SupportersPaginationView`)
+- `views_pix.py` - Configuração PIX (`PIXConfigView`)
+- `views_roles.py` - Sistema de cargos (`PaginatedRoleSelectView`, `DefaultRoleSelectView`, `TimeRoleConfigView`, `RoleConfigView`, etc.)
+- `views_supporter.py` - Gerenciamento de apoiadores (Modais, Views e ações)
+
+**Comandos Principais**:
+
+1. **PIX & Configuração**:
+   - `/pix_config` - Exibe/edita configuração PIX (QR Code, chave, dados)
+   - Modal: `SetQRCodeModal` para atualizar QR Code e dados do titular
+
+2. **Cargos e Apoiadores**:
+   - `/set_default_supporter_role` - Define cargo padrão para todos os apoiadores
+   - `/configure_time_roles` - Configura cargos baseados no tempo de apoio (dias/meses/anos)
+   - `/view_role_config` - Visualiza configurações de cargos do servidor
+
+3. **Gerenciamento de Apoiadores**:
+   - `/add_supporter @usuario [meses] [tipo]` - Adiciona/estende apoio manual
+   - `/pause_supporter @usuario` - Pausa apoio temporariamente
+   - `/resume_supporter @usuario` - Retoma apoio pausado
+   - `/remove_supporter @usuario` - Remove apoiador completamente
+   - `/manage_supporter` - Interface interativa com 4 opções de ação
+
+4. **Dashboard & Informações**:
+   - `/dashboard` - Painel com estatísticas (apoiadores ativos, doações recentes, receita, servidores)
+   - `/servers` - Lista todos os servidores onde o bot está presente
+
+**Features**:
+- Suporte a apoio retroativo (no passado) e antecipado (no futuro)
+- Paginação para cargos (suporta 100+ cargos)
+- Confirmação dupla com `ConfirmationView`
+- Sistema de Time-based roles (automático após confirmação)
+- Dashboard atualiza em tempo real
+- Integração com `SupporterRoleManager` para atribuição automática
+- Acesso restrito a donos do bot (`@check_is_owner()`)
+- Validações de URLs, valores monetários, IDs de usuário
+
+**Fluxo Típico de Apoiador**:
+1. Admin executa `/manage_supporter`
+2. Seleciona ação (Adicionar, Pausar, Continuar ou Remover)
+3. Preenche modal com ID/menção do usuário
+4. Escolhe tipo de período (retroativo ou antecipado)
+5. Seleciona unidade (dias, meses, anos)
+6. Confirma a ação
+7. Sistema atualiza BD e atribui cargos automaticamente
 
 ### RPG (`rpg_system.py`)
 
