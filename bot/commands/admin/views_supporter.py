@@ -463,7 +463,7 @@ class SupporterUnitSelectView(ui.View):
                 if not apoiador:
                     if time_type == "retroative":
                         data_inicio = now - relativedelta(**{unit: threshold})
-                        data_expiracao = now + relativedelta(days=28)
+                        data_expiracao = now
                         type_display = "retroativo"
                     else:
                         data_inicio = now
@@ -509,7 +509,7 @@ class SupporterUnitSelectView(ui.View):
                         apoiador.ativo = True
                         if time_type == "retroative":
                             apoiador.data_inicio = now - relativedelta(**{unit: threshold})
-                            apoiador.data_expiracao = now + relativedelta(months=1)
+                            apoiador.data_expiracao = now
                             type_display = "retroativo"
                         else:
                             apoiador.data_inicio = now

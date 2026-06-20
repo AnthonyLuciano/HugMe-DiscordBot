@@ -91,7 +91,7 @@ class AdminCommands(commands.Cog):
                 if action == 'adicionar':
                     if not apoiador:
                         data_inicio = now - relativedelta(months=months)
-                        data_expiracao = now + relativedelta(days=28)
+                        data_expiracao = now
                         apoiador = Apoiador(
                             discord_id=discord_id,
                             guild_id=guild_id,
