@@ -5,6 +5,22 @@ Todas as mudanças importantes no HugMe serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere à [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.13] - 2026-06-20
+
+### Adicionado / Alterado
+
+- **Remoção completa de cargos de apoiador**: Ao confirmar a remoção de um apoiador via modal administrativo, o sistema agora remove também o cargo padrão de apoiador e todos os cargos por tempo (30d/90d/...) que o usuário possua. Arquivo afetado: `bot/commands/admin/views_supporter.py`.
+
+- **Pergunta de atividade e ajuste de expiração**: Antes da confirmação final ao adicionar/estender apoio, o administrador é perguntado se o apoiador ainda está ativamente apoiando. Se a resposta for "Sim", a `data_expiracao` será incrementada em +1 mês (comportamento aplicado tanto para entradas antecipadas quanto para reativações). Arquivo afetado: `bot/commands/admin/views_supporter.py`.
+
+- **Semântica de apoio retroativo corrigida**: Adições retroativas agora registram `data_inicio` no passado e não aplicam padding automático futuro na `data_expiracao` (ou seja, conta apenas o período efetivamente decorrido). A exceção é quando o administrador indica que o apoiador está ativo — aí a expiração recebe +1 mês conforme acima. Arquivo(s) afetado(s): `bot/commands/admin/views_supporter.py`.
+
+### Notas
+
+- Estas mudanças visam alinhar a atribuição de cargos por tempo com o comportamento esperado: retroativos contam somente o tempo já transcorrido, enquanto antecipados e apoiadores ativos garantem a atribuição imediata do cargo correspondente.
+- Recomenda-se rodar os testes de `tests/test_supporter_roles.py` após aplicar alterações envolvendo regras de tempo/expiração.
+
+
 ## [1.12.9.1] - 2026-05-07
 
 ### Correções

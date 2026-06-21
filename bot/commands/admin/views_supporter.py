@@ -167,10 +167,31 @@ class SupporterPauseModal(ui.Modal, title="Pausar Apoiador"):
                 member = interaction.guild.get_member(int(discord_id))
                 if member:
                     config = await self.role_manager.get_guild_config(guild_id)
-                    if config and config.cargo_apoiador_default:
-                        role = interaction.guild.get_role(int(config.cargo_apoiador_default))
-                        if role and role in member.roles:
-                            await member.remove_roles(role)
+                    roles_to_remove = []
+                    if config:
+                        # Default supporter role
+                        default_role_id = getattr(config, 'cargo_apoiador_default', None)
+                        if default_role_id:
+                            role = interaction.guild.get_role(int(default_role_id))
+                            if role and role in member.roles:
+                                roles_to_remove.append(role)
+
+                        # Time-based supporter roles
+                        cargos_tempo = getattr(config, 'cargos_tempo', None)
+                        if cargos_tempo and isinstance(cargos_tempo, list):
+                            for time_conf in cargos_tempo:
+                                rid = time_conf.get('role_id')
+                                if rid:
+                                    r = interaction.guild.get_role(int(rid))
+                                    if r and r in member.roles:
+                                        roles_to_remove.append(r)
+
+                    if roles_to_remove:
+                        try:
+                            await member.remove_roles(*roles_to_remove)
+                        except Exception:
+                            # Log and continue; role removal failures shouldn't block the flow
+                            logger.exception(f"Falha ao remover cargos de apoiador de {discord_id}")
             except Exception as e:
                 logger.error(f"Erro ao remover cargo: {e}")
 
@@ -429,23 +450,52 @@ class SupporterUnitSelectView(ui.View):
         try:
             time_type_display = "retroativo" if self.time_type == "retroative" else "antecipado"
             description = f"Adicionar/estender apoio de <@{self.discord_id}> por {self.threshold} {unit} ({time_type_display}, tipo: {self.tipo_apoio})"
+            # Antes da confirmação final, perguntar se o apoiador ainda está ativamente apoiando.
+            async def _proceed(active: bool, button_interaction: discord.Interaction):
+                # Cria callback que executa a ação com flag de atividade
+                async def _do_confirm(i: discord.Interaction):
+                    await self._execute_add_action(i, self.discord_id, self.threshold, unit, self.tipo_apoio, self.amount_cents, self.time_type, active_supporting=active)
 
-            view = ConfirmationView(
-                action_description=description,
-                confirm_callback=lambda i: self._execute_add_action(i, self.discord_id, self.threshold, unit, self.tipo_apoio, self.amount_cents, self.time_type),
-            )
+                view_confirm = ConfirmationView(
+                    action_description=(description + (" (Apoiador ativo: Sim — expiração +1 mês)" if active else " (Apoiador ativo: Não)")),
+                    confirm_callback=_do_confirm,
+                )
+                embed_confirm = discord.Embed(
+                    title="⚠️ Confirmar Ação",
+                    description=f"**Ação:** {description}\n\nClique em **CONFIRMAR** para prosseguir.",
+                    color=discord.Color.orange()
+                )
+                await button_interaction.response.send_message(embed=embed_confirm, view=view_confirm, ephemeral=True)
+
+            class _ActiveConfirmView(ui.View):
+                def __init__(self, proceed_cb_yes, proceed_cb_no):
+                    super().__init__()
+                    self.proceed_cb_yes = proceed_cb_yes
+                    self.proceed_cb_no = proceed_cb_no
+
+                @ui.button(label="✅ Sim", style=discord.ButtonStyle.success)
+                async def yes(self, i: discord.Interaction, button: ui.Button):
+                    await i.response.defer(ephemeral=True)
+                    await self.proceed_cb_yes(True, i)
+
+                @ui.button(label="❌ Não", style=discord.ButtonStyle.danger)
+                async def no(self, i: discord.Interaction, button: ui.Button):
+                    await i.response.defer(ephemeral=True)
+                    await self.proceed_cb_no(False, i)
+
+            active_view = _ActiveConfirmView(_proceed, _proceed)
             embed = discord.Embed(
-                title="⚠️ Confirmar Ação",
-                description=f"**Ação:** {description}\n\nClique em **CONFIRMAR** para prosseguir.",
-                color=discord.Color.orange()
+                title="❓ O apoiador ainda está apoiando?",
+                description=("Se o apoiador ainda estiver apoiando ativamente, a data de expiração será ajustada em +1 mês."),
+                color=discord.Color.blue()
             )
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            await interaction.response.send_message(embed=embed, view=active_view, ephemeral=True)
 
         except Exception as e:
             await interaction.response.send_message(f"❌ Erro: {str(e)}", ephemeral=True)
             logger.error(f"Erro ao selecionar unidade: {e}")
 
-    async def _execute_add_action(self, interaction: discord.Interaction, discord_id: str, threshold: int, unit: str, tipo_apoio: str, amount_cents: int | None = None, time_type: str = "retroative"):
+    async def _execute_add_action(self, interaction: discord.Interaction, discord_id: str, threshold: int, unit: str, tipo_apoio: str, amount_cents: int | None = None, time_type: str = "retroative", active_supporting: bool = False):
         # interaction já deferida pela ConfirmationView — usar apenas followup
         try:
             guild_id = str(interaction.guild.id)
@@ -463,11 +513,14 @@ class SupporterUnitSelectView(ui.View):
                 if not apoiador:
                     if time_type == "retroative":
                         data_inicio = now - relativedelta(**{unit: threshold})
-                        data_expiracao = now
+                        # Se ainda está apoiando, atribui expiração para próximo mês
+                        data_expiracao = now + relativedelta(months=1) if active_supporting else now
                         type_display = "retroativo"
                     else:
                         data_inicio = now
                         data_expiracao = now + relativedelta(**{unit: threshold})
+                        if active_supporting:
+                            data_expiracao += relativedelta(months=1)
                         type_display = "antecipado"
 
                     apoiador = Apoiador(
@@ -491,12 +544,22 @@ class SupporterUnitSelectView(ui.View):
                         if time_type == "retroative":
                             if apoiador.data_inicio:
                                 apoiador.data_inicio -= relativedelta(**{unit: threshold})
+                            # retroativo não aumenta expiração a menos que esteja ativo
+                            if active_supporting:
+                                if apoiador.data_expiracao:
+                                    apoiador.data_expiracao += relativedelta(months=1)
+                                else:
+                                    apoiador.data_expiracao = now + relativedelta(months=1)
                             type_display = "retroativo"
                         else:
                             if apoiador.data_expiracao:
                                 apoiador.data_expiracao += relativedelta(**{unit: threshold})
+                                if active_supporting:
+                                    apoiador.data_expiracao += relativedelta(months=1)
                             else:
                                 apoiador.data_expiracao = now + relativedelta(**{unit: threshold})
+                                if active_supporting:
+                                    apoiador.data_expiracao += relativedelta(months=1)
                             type_display = "antecipado"
 
                         if amount_cents is not None:
@@ -509,11 +572,13 @@ class SupporterUnitSelectView(ui.View):
                         apoiador.ativo = True
                         if time_type == "retroative":
                             apoiador.data_inicio = now - relativedelta(**{unit: threshold})
-                            apoiador.data_expiracao = now
+                            apoiador.data_expiracao = now + relativedelta(months=1) if active_supporting else now
                             type_display = "retroativo"
                         else:
                             apoiador.data_inicio = now
                             apoiador.data_expiracao = now + relativedelta(**{unit: threshold})
+                            if active_supporting:
+                                apoiador.data_expiracao += relativedelta(months=1)
                             type_display = "antecipado"
 
                         apoiador.duracao_meses = threshold
