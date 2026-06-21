@@ -465,7 +465,7 @@ class SupporterUnitSelectView(ui.View):
                     description=f"**Ação:** {description}\n\nClique em **CONFIRMAR** para prosseguir.",
                     color=discord.Color.orange()
                 )
-                await button_interaction.response.send_message(embed=embed_confirm, view=view_confirm, ephemeral=True)
+                await button_interaction.followup.send(embed=embed_confirm, view=view_confirm, ephemeral=True)
 
             class _ActiveConfirmView(ui.View):
                 def __init__(self, proceed_cb_yes, proceed_cb_no):
